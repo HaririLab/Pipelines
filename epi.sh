@@ -11,7 +11,7 @@
 #3) 3drefit all files in MNI space with -space MNI -view tlrc
 #4) Keep all temp files in the temp space provided by BIAC
 #5) Add blocks with checks to see if parts of script have been run
-#6) 
+#6) Add a function in the scripts dir to check for dependencies and tell user how to install
 #7) Add in echos for Titles in LOG that can orient LOG reader 
 ###########!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!##########################
 
@@ -24,25 +24,32 @@ sub=20161103_214449
 testDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/pipeTest/20161103_214449
 cd $testDir
 
-###Resample structural to voxel dimensions of epi for grid when deobliquing
-voxSize=$(@GetAfniRes epiTest.nii.gz)
-3dresample -inset antCT/highRes_Brain.nii.gz -master epiTest.nii.gz -prefix referenceWepiSpacing.nii.gz
-#Prep epi for warping
+#########################################Prep epi for warping############################################
 3dTcat -prefix epiTest.nii.gz -tr 2 /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Data/Func/20161103_21449/run005_04/*.hdr #Combine each TR into one dataset
+###Resample structural to voxel dimensions of epi for grid when deobliquing
+#voxSize=$(@GetAfniRes epiTest.nii.gz)
+#3dresample -inset antCT/highRes_Brain.nii.gz -master epiTest.nii.gz -prefix referenceWepiSpacing.nii.gz
 3dTshift -tpattern altplus -prefix epiTest_t.nii.gz epiTest.nii.gz #perform t-shifting
-3dWarp -deoblique -gridset refAnatEpiSpace.nii.gz -prefix epiTest_td.nii.gz epiTest_t.nii.gz #deoblique dataset to avoid alignment and grid issues when warping to T1 and template
-3dvolreg -base 0 -prefix epiTest_tdv.nii.gz -1Dfile motionParams.1D epiTest_td.nii.gz # volume registation and extraction of motion trace
-3dAutomask -prefix epiTest_ExtractionMask.nii.gz epiTest_tdv.nii.gz #Create brain mask for extraction
-3dcalc -a epiTest_ExtractionMask.nii.gz -b epiTest_tdv.nii.gz -expr 'a*b' -prefix epiTest_tdvb.nii.gz #extract brain
-N4BiasFieldCorrection -i epiTest_tdvb.nii.gz #Correct image non-uniformities to improve coregistration
-3dMean -prefix epiTest_tdvbm.nii.gz epiTest_tdvb.nii.gz # Create mean image for more robust alignment to sub T1
+
+3dvolreg -base 0 -prefix epiTest_tv.nii.gz -1Dfile motionParams.1D epiTest_t.nii.gz # volume registation and extraction of motion trace
+3dAutomask -prefix epiTest_ExtractionMask.nii.gz epiTest_tv.nii.gz #Create brain mask for extraction
+3dcalc -a epiTest_ExtractionMask.nii.gz -b epiTest_tv.nii.gz -expr 'a*b' -prefix epiTest_tvb.nii.gz #extract brain
+N4BiasFieldCorrection -i epiTest_tvb.nii.gz #Correct image non-uniformities to improve coregistration
+3dMean -prefix epiTest_tvbm.nii.gz epiTest_tvb.nii.gz # Create mean image for more robust alignment to sub T1
 
 
-####Calculate warp between mean epi and subject's structural, to later be combined with warp between T1 and template
+#####################Calculate warp between mean epi and subject's structural, to later be combined with warp between T1 and template#############################
+
+##Handle obliquity with Extra warping but limit interpolation of EPI to one big step instead of multiple
+
+antsRegistrationSyN.sh -d 3 -m antCT/highRes_deOb.rWarped.nii.gz -f /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Data/Anat/20161103_21449/bia5_21449_002.nii.gz -t r -n 12 -o highres2copl
+antsApplyTransforms -t highres2copl0GenericAffine.mat -r /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Data/Anat/20161103_21449/bia5_21449_002.nii.gz -d 3 0i antCT/highRes_BrainExtractionMask.nii.gz -o copl2highres_BrainExt1.nii.gz
+3dcalc -a copl2highres_BrainExt1.nii.gz -expr 'step(a)' -prefix copl2highres_BrainExt2.nii.gz
+3dcalc -a bia5_21449_002.nii.gz -b copl2highres_BrainExt2.nii.gz -expr 'a*b' -prefix copl2highres_Brain.nii.gz
+
 
 #pipeNotes: Think about and test making an R wrapper (ANTsR) so you can use the synBOLD functionality, could also combine with template warp and apply 
-antsRegistrationSyN.sh -d 3 -m epiTest_tdvbMean.nii.gz -f antCT/highRes_Brain.nii.gz -t r -n 1 -o epi2anat
-########SO far seems like antsRigid registration then nonlinear between T1 and template is most tractable (deoblique first might help). look into synBOLD in ants, but seems to need to be run through ANTSr. 
+antsRegistrationSyN.sh -d 3 -m epiTest_tvbm.nii.gz -f copl2highres_Brain.nii.gz -t r -n 1 -o epi2copl
+antsRegistrationSyN.sh -d 3 -m copl2highres_Brain.nii.gz -f antCT/highRes_Brain.nii.gz -t r -n 1 -o copl2highRes
 
 
-#align_epi_anat.py -anat ${testDir}/antCT/highRes_Brain.nii.gz -epi epiTest.nii.gz -epi_base mean -AddEdge -align_centers -epi2anat -anat_has_skull no -epi_strip 3dAutomask -volreg 3dvolreg -volreg_base 0 -tshift on -tshift_opts '-tpattern altplus'
