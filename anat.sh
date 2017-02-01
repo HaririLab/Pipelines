@@ -47,3 +47,6 @@ recon-all -autorecon2 -autorecon3 -s FreeSurf_20161103_214449
 #Run SUMA
 @SUMA_Make_Spec_FS -ld 60 -sid FreeSurf_${sub}
 
+#cleanup
+mv highRes_* antCT/
+
