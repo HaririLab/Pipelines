@@ -25,7 +25,7 @@ DVARSthresh=1.4 #pipenotes= Change away from HardCoding later, also find citatio
 epi=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Data/Func/20161103_21449/run005_04/*.hdr
 copl=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Data/Anat/20161103_21449/bia5_21449_002.nii.gz
 outDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/pipeTest/20161103_214449/${task}
-tmpDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/pipeTest/20161103_214449/tmp
+tmpDir=${outDir}/tmp
 antDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/pipeTest/20161103_214449/antCT
 template= #pipenotes= Change away from HardCoding later
 antPrefix="highRes_" #pipenotes= Change away from HardCoding later
@@ -70,7 +70,8 @@ voxSize=$(@GetAfniRes ${tmpDir}/epi.nii.gz)
 3dresample -inset $template-master ${tmpDir}/epi.nii.gz -prefix ${tmpDir}/referenceWepiSpacing.nii.gz
 
 ##Apply Warps
-antsApplyTransforms -d 3 -i ${tmpDir}/epi_tvb.nii.gz -r ${tmpDir}/referenceWepiSpacing.nii.gz -t -o ${tmpDir}/epiWarped.nii.gz
+antsApplyTransforms -d 3 -i ${tmpDir}/epi_tvb.nii.gz -r ${tmpDir}/referenceWepiSpacing.nii.gz -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre} SubjectToTemplate0GenericAffine.mat -t ${outDir}/copl2highRes0GenericAffine.mat -t ${outDir}/epi2copl0GenericAffine.mat -o ${outDir}/epiWarped.nii.gz
+
 echo ""
 echo "#########################################################################################################"
 echo "###############Get Motion and QA vals and make Aligment Montage for Visual Inspection####################"
