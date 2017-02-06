@@ -10,6 +10,9 @@
 #1)make citations #citations
 #2)Follow up on #pipeNotes using ctrl f pipeNotes.... Made these when I knew a trick or something I needed to do later
 #3) 3drefit all files in MNI space with -space MNI -view tlrc
+#4) maybe add a cut of brain stem, seems to be some issues with this and could add robustness
+#5) add optimization to template Brain Mask, 3dzcut then inflate to help with slight cutting of top gyri
+
 ###########!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!###########################
 
 
