@@ -23,8 +23,6 @@
 
 sub=$1 #20161103_214449 #$1 or flag -s  #pipenotes= Change away from HardCoding later
 task=rest #$2 or flag -t #pipenotes= Change away from HardCoding later
-FDthresh=.7 #pipenotes= Change away from HardCoding later, also find citations for what you decide likely power 2014, minimun of .5 fd 20DVARS suggested
-DVARSthresh=1.4 #pipenotes= Change away from HardCoding later, also find citations for what you decide
 epi=$2 #/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Data/Func/20161103_21449/run005_04/*.hdr #pipenotes= Change away from HardCoding later
 subDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/pipeTest/${sub}/ #pipenotes= Change away from HardCoding later
 outDir=${subDir}/${task}
@@ -50,6 +48,7 @@ if [[ ! -f ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ]];then
 	echo ""
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!NO antsCT directory!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 	echo "!!!!!!!!!!!!!!!!!need to run anat_DNS.sh first before this script!!!!!!!!!!!!!!!!!!"
+	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!EXITING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 	echo ""
 	exit
 fi
@@ -64,14 +63,15 @@ echo "##########################################################################
 echo "#########################################Prep epi for warping############################################"
 echo "#########################################################################################################"
 echo ""
-3dTcat -prefix ${tmpDir}/epi.nii.gz -tpattern altplus -relabel -tr 2 $epi #Combine each TR into one dataset
-###Resample structural to voxel dimensions of epi for grid when applying warps 
-3dTshift -tpattern altplus -prefix ${tmpDir}/epi_t.nii.gz ${tmpDir}/epi.nii.gz #perform t-shifting
-3dvolreg -base 0 -prefix ${tmpDir}/epi_tv.nii.gz -1Dfile ${outDir}/motion.1D ${tmpDir}/epi_t.nii.gz # volume registation and extraction of motion trace
-3dAutomask -prefix ${tmpDir}/epi_ExtractionMask.nii.gz ${tmpDir}/epi_tv.nii.gz #Create brain mask for extraction
-3dcalc -a ${tmpDir}/epi_ExtractionMask.nii.gz -b ${tmpDir}/epi_tv.nii.gz -expr 'a*b' -prefix ${tmpDir}/epi_tvb.nii.gz #extract brain
-3dTstat -prefix ${tmpDir}/epi_tvbm.nii.gz ${tmpDir}/epi_tvb.nii.gz # Create mean image for more robust alignment to sub T1
-N4BiasFieldCorrection -i ${tmpDir}/epi_tvbm.nii.gz #Correct image non-uniformities in mean(not analyzed just for registration) to improve coregistration
+3dTcat -prefix ${tmpDir}/epi.nii.gz -tpattern altplus -relabel -tr 2 ${epi}/V*.hdr #Combine each TR into one dataset
+###Resample structural to voxel dimensions of epi for grid when applying warps
+3dDespike -prefix ${tmpDir}/epi_d.nii.gz ${tmpDir}/epi.nii.gz #citation:Jo et al., 2014 #pipeNotes: do we want to do this on tasks?? 
+3dTshift -tpattern altplus -prefix ${tmpDir}/epi_dt.nii.gz ${tmpDir}/epi_d.nii.gz #perform t-shifting
+3dvolreg -base 0 -prefix ${tmpDir}/epi_dtv.nii.gz -1Dfile ${outDir}/motion.1D ${tmpDir}/epi_dt.nii.gz # volume registation and extraction of motion trace
+3dAutomask -prefix ${tmpDir}/epi_ExtractionMask.nii.gz ${tmpDir}/epi_dtv.nii.gz #Create brain mask for extraction
+3dcalc -a ${tmpDir}/epi_ExtractionMask.nii.gz -b ${tmpDir}/epi_dtv.nii.gz -expr 'a*b' -prefix ${tmpDir}/epi_dtvb.nii.gz #extract brain
+3dTstat -prefix ${tmpDir}/epi_dtvbm.nii.gz ${tmpDir}/epi_dtvb.nii.gz # Create mean image for more robust alignment to sub T1
+N4BiasFieldCorrection -i ${tmpDir}/epi_dtvbm.nii.gz #Correct image non-uniformities in mean(not analyzed just for registration) to improve coregistration
 N4BiasFieldCorrection -i ${antDir}/${antPre}Brain.nii.gz
 
 echo ""
@@ -80,17 +80,17 @@ echo "###################Calculates Warps to align epi to template via subjects 
 echo "#########################################################################################################"
 echo ""
 
-antsRegistrationSyN.sh -d 3 -m ${tmpDir}/epi_tvbm.nii.gz -f ${antDir}/${antPre}Brain.nii.gz -t r -n 1 -o ${outDir}/epi2highRes #Might want to keep for Surface Processing Purposes
-antsRegistrationSyN.sh -d 3 -m ${tmpDir}/epi_tvbm.nii.gz -f ${antDir}/${antPre}Brain.nii.gz -t a -n 1 -o ${outDir}/epi2highResAff #Might want to keep for Surface Processing Purposes
+antsRegistrationSyN.sh -d 3 -m ${tmpDir}/epi_dtvbm.nii.gz -f ${antDir}/${antPre}Brain.nii.gz -t r -n 1 -o ${outDir}/epi2highRes #Might want to keep for Surface Processing Purposes
+antsRegistrationSyN.sh -d 3 -m ${tmpDir}/epi_dtvbm.nii.gz -f ${antDir}/${antPre}Brain.nii.gz -t a -n 1 -o ${outDir}/epi2highResAff #Might want to keep for Surface Processing Purposes
 voxSize=$(@GetAfniRes ${tmpDir}/epi.nii.gz)
 3dresample -input ${templateDir}/${templatePre}Brain.nii.gz -dxyz $voxSize -prefix ${tmpDir}/refTemplate4epi.nii.gz
 
 ##Apply Warps #citation: https://github.com/stnava/ANTs/wiki/antsCorticalThickness-and-antsLongitudinalCorticalThickness-output and https://github.com/maxwe128/restTools/blob/master/preprocessing/norm.func.spm12sa.csh 
 ##Used WarpTimeSeries instead of AntsApplyTransforms because it worked with 4d time series and I couldn't get applyTransforms to. But when applying each method to the mean image gave perfectly identical results
 #pipeNotes: Think about using NearestNeighbor in applying warps, thats what michael did, and you could ask him why if needed
-WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_tvbm.nii.gz ${tmpDir}/epiWarpedMean.nii.gz -R ${tmpDir}/refTemplate4epi.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${outDir}/epi2highRes0GenericAffine.mat
-WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_tvb.nii.gz ${outDir}/epiWarped.nii.gz -R ${tmpDir}/refTemplate4epi.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${outDir}/epi2highRes0GenericAffine.mat
-WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_tvbm.nii.gz ${tmpDir}/epiWarpedMeanAff.nii.gz -R ${tmpDir}/refTemplate4epi.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${outDir}/epi2highResAff0GenericAffine.mat
+WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_dtvbm.nii.gz ${tmpDir}/epiWarpedMean.nii.gz -R ${tmpDir}/refTemplate4epi.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${outDir}/epi2highRes0GenericAffine.mat
+WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_dtvb.nii.gz ${outDir}/epiWarped.nii.gz -R ${tmpDir}/refTemplate4epi.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${outDir}/epi2highRes0GenericAffine.mat
+WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_dtvbm.nii.gz ${tmpDir}/epiWarpedMeanAff.nii.gz -R ${tmpDir}/refTemplate4epi.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${outDir}/epi2highResAff0GenericAffine.mat
 3drefit -space MNI -view tlrc ${outDir}/epiWarped.nii.gz #Refit space of warped epi so that it can be viewed in MNI space within AFNI
 3drefit -space MNI -view tlrc ${tmpDir}/epiWarpedMeanAff.nii.gz #Refit space of warped epi so that it can be viewed in MNI space within AFNI
 
@@ -101,28 +101,25 @@ echo "##########################################################################
 echo ""
 ######Calculation of motion, DVARs, alignment correlation and plots to have for censoring and QC
 #Calculate FD, #citation: Power et al., 2012 
-fsl_motion_outliers -i ${tmpDir}/epi_t.nii.gz -o ${tmpDir}/conf -s ${outDir}/FD.1D --fd #Use fsl tools because the automatically do it the same as Power 2012 #citation: https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FSLMotionOutliers
-fsl_motion_outliers --nomoco --dvars -m ${tmpDir}/epi_ExtractionMask.nii.gz -o tempConf -s fslDVARS.1D -i tmp/epi_tvb.nii.gz #calc FSL style for the purpose of comparison #pipenotes: might want to remove
+fsl_motion_outliers -i ${tmpDir}/epi_dt.nii.gz -o ${tmpDir}/conf -s ${outDir}/FD.1D --fd #Use fsl tools because the automatically do it the same as Power 2012 #citation: https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FSLMotionOutliers
+fsl_motion_outliers --nomoco --dvars -m ${tmpDir}/epi_ExtractionMask.nii.gz -o ${tmpDir}/tempConf -s fslDVARS.1D -i tmp/epi_dtvb.nii.gz #calc FSL style for the purpose of comparison #pipenotes: might want to remove
 #Caluclate DVARS #citation: Nichols, 2013
-DVARS.sh ${tmpDir}/epi_tv.nii.gz ${outDir}/DVARS.1D  ##Use Tom Nichols standardized DVARs #pipenotes: consider rescaling to Power 2014 so you can use his threshold suggestions
+DVARS.sh ${tmpDir}/epi_dtv.nii.gz ${outDir}/DVARS.1D  ##Use Tom Nichols standardized DVARs #pipenotes: consider rescaling to Power 2014 so you can use his threshold suggestions
 #Calculate derivative of motion params for confound regression, #citation: Power et al., 2014
 1d_tool.py -infile ${outDir}/motion.1D -derivative -write ${outDir}/motion_deriv.1D
 #calculate TRs above threshold
-awk -v thresh=$FDthresh '{if($1 > thresh) print NR}' ${outDir}/FD.1D > ${outDir}/FDcensorTRs.1D #find TRs above threshold 
-awk -v thresh=$DVARSthresh '{if($1 > thresh) print NR}' ${outDir}/DVARS.1D > ${outDir}/DVARScensorTRs.1D #find TRs above threshold
 awk -v thresh=".25" '{if($1 > thresh) print NR}' ${outDir}/FD.1D > ${outDir}/FD.25TRs.1D #find TRs above threshold 
 awk -v thresh=".5" '{if($1 > thresh) print NR}' ${outDir}/FD.1D > ${outDir}/FD.5TRs.1D #find TRs above threshold 
-cat ${outDir}/FDcensorTRs.1D ${outDir}/DVARScensorTRs.1D | sort -g | uniq > ${outDir}/censorTRs.1D #combine DVARS and FD TRs above threshold 
 ###Make QC vals file, spatial correlations for each warp, and anything else from http://ccpweb.wustl.edu/pdfs/2013hcp2_barch.pdf
 
 ##Make QC/QA montages
 #pipenotes: consider making carpet plots and WC-RSFC plots for at least all connectivity pipelines before and after preprocessing
 3dresample -input ${templateDir}/${templatePre}BrainExtractionMask.nii.gz -master ${tmpDir}/refTemplate4epi.nii.gz -prefix ${tmpDir}/refTemplateBrainMask.nii.gz
 #tSNR
-3dTstat -cvarinvNOD -prefix ${tmpDir}/tSNR.nii.gz ${tmpDir}/epi_tvb.nii.gz
+3dTstat -cvarinvNOD -prefix ${tmpDir}/tSNR.nii.gz ${tmpDir}/epi_dtvb.nii.gz
 tSNR=$(3dBrickStat -mask ${tmpDir}/epi_ExtractionMask.nii.gz ${tmpDir}/tSNR.nii.gz | sed "s/ *//g" | sed "s/\t\t*//g" )
 #smoothness before and after warping
-rawFWHM=$(3dFWHMx -mask ${tmpDir}/epi_ExtractionMask.nii.gz -combine ${tmpDir}/epi_tvb.nii.gz | cut -d " " -f11 | sed "s/ *//g" | sed "s/\t\t*//g" )
+rawFWHM=$(3dFWHMx -mask ${tmpDir}/epi_ExtractionMask.nii.gz -combine ${tmpDir}/epi_dtvb.nii.gz | cut -d " " -f11 | sed "s/ *//g" | sed "s/\t\t*//g" )
 warpedFWHM=$(3dFWHMx -mask ${tmpDir}/refTemplateBrainMask.nii.gz -combine ${outDir}/epiWarped.nii.gz | cut -d " " -f11 | sed "s/ *//g" | sed "s/\t\t*//g" )
 #Motion QC Measures
 nVols=$(3dinfo -nv ${outDir}/epiWarped.nii.gz)
@@ -130,12 +127,8 @@ FDavg=$(1d_tool.py -show_mmms -infile ${outDir}/FD.1D | sed 's/ /,/g' | cut -d "
 FDsd=$(1d_tool.py -show_mmms -infile ${outDir}/FD.1D | sed 's/ /,/g' | cut -d "," -f25 | sed '/^$/d')
 DVARSavg=$(1d_tool.py -show_mmms -infile ${outDir}/DVARS.1D | sed 's/ /,/g' | cut -d "," -f15 | sed '/^$/d')
 DVARSsd=$(1d_tool.py -show_mmms -infile ${outDir}/DVARS.1D | sed 's/ /,/g' | cut -d "," -f25 | sed '/^$/d')
-numCenFD=$(cat ${outDir}/FDcensorTRs.1D | wc -l)
-numCenDVARS=$(cat ${outDir}/DVARScensorTRs.1D | wc -l)
 numCenFD25=$(cat ${outDir}/FD.25TRs.1D | wc -l)
 numCenFD50=$(cat ${outDir}/FD.5TRs.1D | wc -l)
-FDcenPer=$(echo "${numCenFD}/${nVols}" | bc -l | cut -c1-5)
-DVARScenPer=$(echo "${numCenDVARS}/${nVols}" | bc -l | cut -c1-5)
 FD25Per=$(echo "${numCenFD25}/${nVols}" | bc -l | cut -c1-5)
 FD50Per=$(echo "${numCenFD50}/${nVols}" | bc -l | cut -c1-5)
 #spatial correlations between epi and highres, epi and Template, and highRes and template as a crude index of alignment quality
@@ -143,8 +136,8 @@ epi2TemplateCor=$(3ddot -mask ${tmpDir}/refTemplateBrainMask.nii.gz ${tmpDir}/re
 epi2highResCor=$(3ddot -mask ${antDir}/${antPre}BrainExtractionMask.nii.gz ${antDir}/${antPre}Brain.nii.gz ${outDir}/epi2highResWarped.nii.gz | sed "s/ *//g"| sed "s/\t\t*//g")
 highRes2TemplateCor=$(3ddot -mask ${templateDir}/${templatePre}BrainExtractionMask.nii.gz  ${antDir}/${antPre}BrainNormalizedToTemplate.nii.gz ${templateDir}/${templatePre}Brain.nii.gz | sed "s/ *//g" | sed "s/\t\t*//g")
 #set up QC table for subject
-echo "tSNR,rawFWHM,warpedFWHM,FDavg,FDsd,DVARSavg,DVARSsd,FDcenPer,FD25Per,FD50Per,DVARScenPer,epi2TemplateCor,epi2highResCor,highRes2TemplateCor" > ${QADir}/${task}.QCmeasures.txt
-echo "$tSNR,$rawFWHM,$warpedFWHM,$FDavg,$FDsd,$DVARSavg,$DVARSsd,$FDcenPer,$FD25Per,$FD50Per,$DVARScenPer,$epi2TemplateCor,$epi2highResCor,$highRes2TemplateCor" >> ${QADir}/${task}.QCmeasures.txt
+echo "tSNR,rawFWHM,warpedFWHM,FDavg,FDsd,DVARSavg,DVARSsd,FD25Per,FD50Per,epi2TemplateCor,epi2highResCor,highRes2TemplateCor" > ${QADir}/${task}.QCmeasures.txt
+echo "$tSNR,$rawFWHM,$warpedFWHM,$FDavg,$FDsd,$DVARSavg,$DVARSsd,$FD25Per,$FD50Per,$epi2TemplateCor,$epi2highResCor,$highRes2TemplateCor" >> ${QADir}/${task}.QCmeasures.txt
 ######Make Edges and montage of warped edges overlain target Struct to check alignment
 ##epi Alignment to HighRes
 3dedge3 -input ${outDir}/epi2highResWarped.nii.gz -prefix ${tmpDir}/epi2highResWarpedEdges.nii.gz  #Detect edges
@@ -162,7 +155,7 @@ ConvertScalarImageToRGB 3 ${tmpDir}/highRes2TemplateWarpedEdges.nii.gz ${tmpDir}
 3dcalc -a ${tmpDir}/highRes2TemplateEdgesRBG.nii.gz -expr 'step(a)' -prefix ${tmpDir}/highRes2TemplateEdgesRBGstep.nii.gz #Make mask to make Edges stand out
 CreateTiledMosaic -i ${templateDir}/${templatePre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/highRes2TemplateEdgesRBG.nii.gz -o ${QADir}/${task}.highRes2TemplateAlignmentCheck.png -a 0.8 -t -1x-1 -d 2 -p mask -s [5,mask,mask] -x ${tmpDir}/highRes2TemplateEdgesRBGstep.nii.gz -f 0x1  #Create Montage taking images in axial slices every 5 slices
 ##epiWarpedMean to Template
-WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_tvbm.nii.gz ${tmpDir}/epiWarpedMeanTempRef.nii.gz -R ${templateDir}/${templatePre}BrainSegmentation0N4.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${outDir}/epi2highRes0GenericAffine.mat #Get overlay on the same grid
+WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_dtvbm.nii.gz ${tmpDir}/epiWarpedMeanTempRef.nii.gz -R ${templateDir}/${templatePre}BrainSegmentation0N4.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${outDir}/epi2highRes0GenericAffine.mat #Get overlay on the same grid
 3dedge3 -input ${tmpDir}/epiWarpedMeanTempRef.nii.gz -prefix ${tmpDir}/epi2TemplateWarpedEdges.nii.gz  #Detect edges
 ConvertScalarImageToRGB 3 ${tmpDir}/epi2TemplateWarpedEdges.nii.gz ${tmpDir}/epi2TemplateEdgesRBG.nii.gz none red none 0 10 #convert for Ants Montage
 3dcalc -a ${tmpDir}/epi2TemplateEdgesRBG.nii.gz -expr 'step(a)' -prefix ${tmpDir}/epi2TemplateEdgesRBGstep.nii.gz #Make mask to make Edges stand out
@@ -173,6 +166,7 @@ CreateTiledMosaic -i ${templateDir}/${templatePre}BrainSegmentation0N4.nii.gz -r
 
 
 ##########Citations
+#Jo, H. J., Gotts, S. J., Reynolds, R. C., Bandettini, P. A., Martin, A., Cox, R. W., & Saad, Z. S. (2013). Effective preprocessing procedures virtually eliminate distance-dependent motion artifacts in resting state FMRI. Journal of Applied Mathematics, 2013. http://doi.org/10.1155/2013/935154
 #Nichols, 2013 http://www2.warwick.ac.uk/fac/sci/statistics/staff/academic-research/nichols/scripts/fsl/StandardizedDVARS.pdf and https://www2.warwick.ac.uk/fac/sci/statistics/staff/academic-research/nichols/scripts/fsl/DVARS.sh
 #Power, J. D., Barnes, K. A., Snyder, A. Z., Schlaggar, B. L., & Petersen, S. E. (2012). Spurious but systematic correlations in functional connectivity MRI networks arise from subject motion. NeuroImage, 59(3), 2142–2154. http://doi.org/10.1016/j.neuroimage.2011.10.018
 

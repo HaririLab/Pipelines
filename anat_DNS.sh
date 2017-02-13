@@ -26,6 +26,7 @@ subDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/pipeTest/${sub} 
 QADir=${subDir}/QA
 antDir=${subDir}/antCT
 freeDir=${subDir}/FreeSurfer
+tmpDir=${antDir}/tmp
 antPre="highRes_" #pipenotes= Change away from HardCoding later
 templateDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/Max/templates/dunedin98_antCT #pipenotes= update/Change away from HardCoding later
 templatePre=dunedin98Template_MNI #pipenotes= update/Change away from HardCoding later
@@ -40,7 +41,7 @@ export OMP_NUM_THREADS=$threads
 mkdir -p $QADir
 cd $subDir
 mkdir -p $antDir
-mkdir -p ${antDir}/tmp
+mkdir -p $tmpDir
 
 SUBJECTS_DIR=${subDir} #pipenotes= update/Change away from HardCoding later also figure out FS_AVG stuff
 if [[ ! -f ${antDir}/${antPre}Brain.nii.gz ]];then
@@ -51,8 +52,11 @@ if [[ ! -f ${antDir}/${antPre}Brain.nii.gz ]];then
 	echo ""
 	###Rigidly align, to avoid future processing issues
 	antsRegistrationSyN.sh -d 3 -t r -f ${templateDir}/${templatePre}.nii.gz -m $T1 -n $threads -o ${antDir}/${antPre}r
-
 	brainExtractSYN.sh ${antDir}/${antPre}rWarped.nii.gz  ${templateDir}/${templatePre}.nii.gz  ${templateDir}/${templatePre}_BrainExtractionMaskDil1.nii.gz ${antDir}/$antPre $threads #pipenotes= update to the right template
+	###Make Montage to check for Brain Extraction Quality
+	ConvertScalarImageToRGB 3 ${antDir}/${antPre}Brain.nii.gz ${tmpDir}/highRes_BrainRBG.nii.gz none red none 0 10
+	3dcalc -a ${tmpDir}/highRes_BrainRBG.nii.gz -expr 'step(a)' -prefix ${tmpDir}/highRes_BrainRBGstep.nii.gz
+	CreateTiledMosaic -i ${antDir}/${antPre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/highRes_BrainRBG.nii.gz -o ${QAdir}/anat.BrainExtractionCheck.png -a 0.8 -t -1x-1 -d 2 -p mask -s [5,mask,mask] -x ${tmpDir}/highRes_BrainRBGstep.nii.gz -f 0x1
 else
 	echo ""
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!Skipping Brain Extraction, Completed Previously!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -99,6 +103,7 @@ if [[ ! -f ${freeDir}/SUMA/std.60.rh.pial.asc ]];then
 	echo "######################################Map Surfaces to SUMA and AFNI######################################"
 	echo "#########################################################################################################"
 	echo ""
+	cd ${freeDir}
 	@SUMA_Make_Spec_FS -ld 60 -sid FreeSurfer
 else
 	echo ""
