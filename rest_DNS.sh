@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Script: rest_DNS.sh
-# Purpose: Take a minimally preprocessed Resting State Scan and finish preprocessing up to Group Analyses
+# Purpose: Take a minimally preprocessed Resting State Scan and finish preprocessing so that subject is ready for Group Analyses
 # Author: Maxwell Elliott
 
 ################Steps to include#######################
@@ -31,8 +31,8 @@ templateDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/Max/templates/
 templatePre=dunedin98Template_MNI_ #pipenotes= update/Change away from HardCoding later
 antDir=${subDir}/antCT
 antPre="highRes_" #pipenotes= Change away from HardCoding later
-FDthresh=.7 #pipenotes= Change away from HardCoding later, also find citations for what you decide likely power 2014, minimun of .5 fd 20DVARS suggested
-DVARSthresh=1.4 #pipenotes= Change away from HardCoding later, also find citations for what you decide
+FDthresh=.9 #pipenotes= Change away from HardCoding later, also find citations for what you decide likely power 2014, minimun of .5 fd 20DVARS suggested
+DVARSthresh=1.6 #pipenotes= Change away from HardCoding later, also find citations for what you decide
 
 mkdir -p $tmpDir
 if [[ ! -f ${minProcEpi} ]];then
@@ -68,7 +68,7 @@ cat ${outDir}/FDcensorTRs.1D ${outDir}/DVARScensorTRs.1D | sort -g | uniq > ${ou
 
 ####Project everything out
 clist=$(cat ${outDir}/censorTRs.1D)
-3dTproject -input ${outDir}/epiWarped.nii.gz -prefix epiPrepped.nii.gz -CENSORTR $clist -ort ${outDir}/pc.wm.csf_vec.1D -ort motion.1D -ort motion_deriv.1D -polort 1 -bandpass 0.008 0.10 -blur 8 ##pipeNotes: add in mask based on subjects GM warped to template and thresholded
+3dTproject -input ${outDir}/epiWarped.nii.gz -prefix ${outDir}/epiPrepped.nii.gz -CENSORTR $clist -ort ${outDir}/pc.wm.csf_vec.1D -ort ${outDir}/motion.1D -ort ${outDir}/motion_deriv.1D -polort 1 -bandpass 0.008 0.10 -blur 8 ##pipeNotes: add in mask based on subjects GM warped to template and thresholded
 
 
 

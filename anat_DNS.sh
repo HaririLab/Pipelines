@@ -56,7 +56,7 @@ if [[ ! -f ${antDir}/${antPre}Brain.nii.gz ]];then
 	###Make Montage to check for Brain Extraction Quality
 	ConvertScalarImageToRGB 3 ${antDir}/${antPre}Brain.nii.gz ${tmpDir}/highRes_BrainRBG.nii.gz none red none 0 10
 	3dcalc -a ${tmpDir}/highRes_BrainRBG.nii.gz -expr 'step(a)' -prefix ${tmpDir}/highRes_BrainRBGstep.nii.gz
-	CreateTiledMosaic -i ${antDir}/${antPre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/highRes_BrainRBG.nii.gz -o ${QAdir}/anat.BrainExtractionCheck.png -a 0.8 -t -1x-1 -d 2 -p mask -s [5,mask,mask] -x ${tmpDir}/highRes_BrainRBGstep.nii.gz -f 0x1
+	CreateTiledMosaic -i ${antDir}/${antPre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/highRes_BrainRBG.nii.gz -o ${QADir}/anat.BrainExtractionCheck.png -a 0.8 -t -1x-1 -d 2 -p mask -s [5,mask,mask] -x ${tmpDir}/highRes_BrainRBGstep.nii.gz -f 0x1
 else
 	echo ""
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!Skipping Brain Extraction, Completed Previously!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
