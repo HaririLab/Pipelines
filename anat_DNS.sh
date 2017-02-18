@@ -30,9 +30,9 @@ tmpDir=${antDir}/tmp
 antPre="highRes_" #pipenotes= Change away from HardCoding later
 templateDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/Max/templates/dunedin98_antCT #pipenotes= update/Change away from HardCoding later
 templatePre=dunedin98Template_MNI #pipenotes= update/Change away from HardCoding later
-T1=$2 #/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Data/Anat/20161103_21449/bia5_21449_006.nii.gz #pipenotes= update/Change away from HardCoding later
+#T1=$2 #/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Data/Anat/20161103_21449/bia5_21449_006.nii.gz #pipenotes= update/Change away from HardCoding later
 threads=1 #default in case thread argument is not passed
-threads=$3
+threads=$2
 
 export PATH=$PATH:/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/Pipelines/scripts/ #add dependent scripts to path #pipenotes= update/Change to DNS scripts
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$threads
@@ -44,6 +44,19 @@ mkdir -p $antDir
 mkdir -p $tmpDir
 
 SUBJECTS_DIR=${subDir} #pipenotes= update/Change away from HardCoding later also figure out FS_AVG stuff
+
+T1pre=$(grep $sub /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/All_Imaging/DataLocations.csv | cut -d "," -f3)
+
+if [[ ${T1pre} == *.nii.gz ]];then
+	T1=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/$T1pre
+else
+	to3d -anat -prefix tmpT1.nii.gz /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/${T1pre}/*.dcm
+	mv tmpT1.nii.gz ${tmpDir}/
+	T1=${tmpDir}/tmpT1.nii.gz
+fi
+
+
+
 if [[ ! -f ${antDir}/${antPre}Brain.nii.gz ]];then
 	echo ""
 	echo "#########################################################################################################"
