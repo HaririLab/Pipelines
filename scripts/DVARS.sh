@@ -3,7 +3,8 @@
 # Script: DVARS.sh
 # Purpose: Create standardized version of DVARS
 # Author: T. Nichols
-# Version: $Id: DVARS.sh,v 1.2 2012/10/26 22:17:19 nichols Exp $
+# Version: http://github.com/nicholst/DVARS/commit/5814337
+#          2017-02-19 08:18:50 +0000
 #
 
 
@@ -33,18 +34,18 @@ Options
     -all Produce 2 additional versions of DVARS.
 
 Creates standardized version of DVARS, normalizing according to the expected 
-standard deviation of DVARS under an AR1 model. DVARSout, consists of plain text 
-file with a normalized version of DVARS, scaled so that it is approximately 1 if 
+value of DVARS under an AR1 model. DVARSout, consists of plain text file with
+this normalized version of DVARS, scaled so that it is approximately 1 if  
 there are no artifacts. 
 
 With the -all option, 2 additional columns are added to DVARSout.  The 2nd column
-is the raw DVARS with no scaling (precisely the standard deviation of the temporal 
-difference).  The 3rd is the precision-normalized DVARS:  Before taking the SD, 
+is the raw DVARS with no scaling (precisely the root mean square (RMS) of the temporal 
+difference).  The 3rd is the precision-normalized DVARS:  Before taking the RMS, 
 temporal difference images are standardized voxel-wise giving a more precisely
 normalized DVARS measure.  A side effect, however, is that high-variance parts of 
 the image are down-weighted relative to low-variance areas.
 _________________________________________________________________________
-\$Id: DVARS.sh,v 1.2 2012/10/26 22:17:19 nichols Exp $
+\$Id: 22c29d73383968ef25d48d60ad64291a22f27736 $
 EOF
 exit
 }
@@ -130,27 +131,27 @@ DiffSDmean=$(fslstats $Tmp-DiffSDhat -k $Tmp-MeanBrain -M)
 
 echo -n "."
 
-# Compute temporal difference time series
+# Compute temporal difference squared time series
 nVol=$(fslnvols "$FUNC")
 fslroi "$FUNC" $Tmp-FUNC0 0 $((nVol-1))
 fslroi "$FUNC" $Tmp-FUNC1 1 $nVol
+fslmaths $Tmp-FUNC0 -sub $Tmp-FUNC1 -sqr $Tmp-DiffSq -odt float
 
 echo -n "."
 
 # Compute DVARS, no standization
-fslmaths $Tmp-FUNC0 -sub $Tmp-FUNC1                $Tmp-Diff -odt float
-fslstats -t $Tmp-Diff       -k $Tmp-MeanBrain -S > $Tmp-DiffSD.dat
+fslstats -t $Tmp-DiffSq -k $Tmp-MeanBrain -M > $Tmp-DiffVar.dat
 
 if [ "$AllVers" = "" ] ; then
     # Standardized
-    awk '{printf("%g\n",$1/'"$DiffSDmean"')}' $Tmp-DiffSD.dat > "$OUT"
+    awk '{printf("%g\n",sqrt($1)/'"$DiffSDmean"')}' $Tmp-DiffVar.dat > "$OUT"
 else
     # Compute DVARS, based on voxel-wise standardized image
-    fslmaths $Tmp-FUNC0 -sub $Tmp-FUNC1 -div $Tmp-DiffSDhat $Tmp-DiffVxStdz
-    fslstats -t $Tmp-DiffVxStdz -k $Tmp-MeanBrain -S > $Tmp-DiffVxStdzSD.dat
+    fslmaths $Tmp-FUNC0 -sub $Tmp-FUNC1 -div $Tmp-DiffSDhat -sqr $Tmp-DiffSqVxStdz
+    fslstats -t $Tmp-DiffSqVxStdz -k $Tmp-MeanBrain -M | awk '{print sqrt($1)}' > $Tmp-DiffVxStdzSD.dat
 
     # Sew it all together
-    awk '{printf("%g\t%g\n",$1/'"$DiffSDmean"',$1)}' $Tmp-DiffSD.dat > $Tmp-DVARS
+    awk '{printf("%g\t%g\n",sqrt($1)/'"$DiffSDmean"',sqrt($1))}' $Tmp-DiffVar.dat > $Tmp-DVARS
     paste $Tmp-DVARS $Tmp-DiffVxStdzSD.dat > "$OUT"
 fi
 
