@@ -36,11 +36,6 @@ threads=$2
 export PATH=$PATH:/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/Pipelines/scripts/ #add dependent scripts to path #pipenotes= update/Change to DNS scripts
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$threads
 export OMP_NUM_THREADS=$threads
-##Set up directory
-mkdir -p $QADir
-cd $subDir
-mkdir -p $antDir
-mkdir -p $tmpDir
 
 T1pre=$(grep $sub /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/All_Imaging/DataLocations.csv | cut -d "," -f3)
 if [[ $T1pre == "not_collected" ]];then
@@ -51,48 +46,55 @@ if [[ $T1pre == "not_collected" ]];then
 	exit
 fi
 
-if [[ ${T1pre} == *.nii.gz ]];then
-	T1=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/${T1pre}
-else
-	###Check to make sure T1 has correct number of slices other exit and complain
-	lenT1=$(ls /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/${T1pre}/*.dcm | wc -l)
-	if [[ $lenT1 == 162 ]];then
-		to3d -anat -prefix tmpT1.nii.gz /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/${T1pre}/*.dcm
-		mv tmpT1.nii.gz ${tmpDir}/
-		T1=${tmpDir}/tmpT1.nii.gz
-	else
-		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!T1 is the Wrong Size, wrong number of slices!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!EXITING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-		exit
-	fi
-fi
-
-###Rigidly align, to avoid future processing issues
-antsRegistrationSyN.sh -d 3 -t r -f ${templateDir}/${templatePre}.nii.gz -m $T1 -n $threads -o ${antDir}/${antPre}r
+##Set up directory
+mkdir -p $QADir
+cd $subDir
+mkdir -p $antDir
+mkdir -p $tmpDir
 SUBJECTS_DIR=${subDir} #pipenotes= update/Change away from HardCoding later also figure out FS_AVG stuff
 
-
-#if [[ ! -f ${antDir}/${antPre}Brain.nii.gz ]];then
-#	echo ""
-#	echo "#########################################################################################################"
-#	echo "####################################SyN Warp Based Brain Extraction######################################"
-#	echo "#########################################################################################################"
-#	echo ""
-#	brainExtractSYN.sh ${antDir}/${antPre}rWarped.nii.gz  ${templateDir}/${templatePre}.nii.gz  ${templateDir}/${templatePre}_BrainExtractionMaskDil1.nii.gz ${antDir}/$antPre $threads #pipenotes= update to the right template
-#	###Make Montage to check for Brain Extraction Quality
-#	ConvertScalarImageToRGB 3 ${antDir}/${antPre}Brain.nii.gz ${tmpDir}/highRes_BrainRBG.nii.gz none red none 0 10
-#	3dcalc -a ${tmpDir}/highRes_BrainRBG.nii.gz -expr 'step(a)' -prefix ${tmpDir}/highRes_BrainRBGstep.nii.gz
-#	CreateTiledMosaic -i ${antDir}/${antPre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/highRes_BrainRBG.nii.gz -o ${QADir}/anat.BrainExtractionCheck.png -a 0.8 -t -1x-1 -d 2 -p mask -s [5,mask,mask] -x ${tmpDir}/highRes_BrainRBGstep.nii.gz -f 0x1
-#else
-#	echo ""
-#	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!Skipping Brain Extraction, Completed Previously!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-#	echo ""
-#fi
-
-#Make Montage of sub T1 brain extraction to check quality
 if [[ ! -f ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate.nii.gz ]];then
+
+	if [[ ${T1pre} == *.nii.gz ]];then
+		T1=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/${T1pre}
+	else
+		###Check to make sure T1 has correct number of slices other exit and complain
+		lenT1=$(ls /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/${T1pre}/*.dcm | wc -l)
+		if [[ $lenT1 == 162 ]];then
+			to3d -anat -prefix tmpT1.nii.gz /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/${T1pre}/*.dcm
+			mv tmpT1.nii.gz ${tmpDir}/
+			T1=${tmpDir}/tmpT1.nii.gz
+		else
+			echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+			echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!T1 is the Wrong Size, wrong number of slices!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+			echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!EXITING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+			echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+			exit
+		fi
+	fi
+
+	###Rigidly align, to avoid future processing issues
+	antsRegistrationSyN.sh -d 3 -t r -f ${templateDir}/${templatePre}.nii.gz -m $T1 -n $threads -o ${antDir}/${antPre}r
+
+	#if [[ ! -f ${antDir}/${antPre}Brain.nii.gz ]];then
+	#	echo ""
+	#	echo "#########################################################################################################"
+	#	echo "####################################SyN Warp Based Brain Extraction######################################"
+	#	echo "#########################################################################################################"
+	#	echo ""
+	#	brainExtractSYN.sh ${antDir}/${antPre}rWarped.nii.gz  ${templateDir}/${templatePre}.nii.gz  ${templateDir}/${templatePre}_BrainExtractionMaskDil1.nii.gz ${antDir}/$antPre $threads #pipenotes= update to the right template
+	#	###Make Montage to check for Brain Extraction Quality
+	#	ConvertScalarImageToRGB 3 ${antDir}/${antPre}Brain.nii.gz ${tmpDir}/highRes_BrainRBG.nii.gz none red none 0 10
+	#	3dcalc -a ${tmpDir}/highRes_BrainRBG.nii.gz -expr 'step(a)' -prefix ${tmpDir}/highRes_BrainRBGstep.nii.gz
+	#	CreateTiledMosaic -i ${antDir}/${antPre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/highRes_BrainRBG.nii.gz -o ${QADir}/anat.BrainExtractionCheck.png -a 0.8 -t -1x-1 -d 2 -p mask -s [5,mask,mask] -x ${tmpDir}/highRes_BrainRBGstep.nii.gz -f 0x1
+	#else
+	#	echo ""
+	#	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!Skipping Brain Extraction, Completed Previously!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+	#	echo ""
+	#fi
+
+	#Make Montage of sub T1 brain extraction to check quality
+
 	echo ""
 	echo "#########################################################################################################"
 	echo "########################################ANTs Cortical Thickness##########################################"
@@ -100,8 +102,6 @@ if [[ ! -f ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate.nii.gz ]];th
 	echo ""
 	###Run antCT
 	antsCorticalThickness.sh -d 3 -a ${antDir}/${antPre}rWarped.nii.gz -e ${templateDir}/${templatePre}.nii.gz -m ${templateDir}/${templatePre}_BrainCerebellumProbabilityMask.nii.gz -p ${templateDir}/${templatePre}_BrainSegmentationPosteriors%d.nii.gz -t ${templateDir}/${templatePre}_Brain.nii.gz -o ${antDir}/${antPre}
-	##Make sure that the Brain is extracted
-	3dcalc -a ${antDir}/${antPre}rWarped.nii.gz -b ${antDir}/${antPre}BrainExtactionMask.nii.gz -expr 'a*b' -prefix ${antDir}/${antPre}Brain.nii.gz
 else
 	echo ""
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Skipping antCT, Completed Previously!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -114,7 +114,7 @@ if [[ ! -f ${QADir}/anat.BrainExtractionCheckAxial.png ]];then
 	echo "####################################Make QA montages######################################"
 	echo "#########################################################################################################"
 	echo ""
-	ConvertScalarImageToRGB 3 ${antDir}/${antPre}Brain.nii.gz ${tmpDir}/highRes_BrainRBG.nii.gz none red none 0 10
+	ConvertScalarImageToRGB 3 ${antDir}/${antPre}ExtractedBrain0N4.nii.gz ${tmpDir}/highRes_BrainRBG.nii.gz none red none 0 10
 	3dcalc -a ${tmpDir}/highRes_BrainRBG.nii.gz -expr 'step(a)' -prefix ${tmpDir}/highRes_BrainRBGstep.nii.gz
 	CreateTiledMosaic -i ${antDir}/${antPre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/highRes_BrainRBG.nii.gz -o ${QADir}/anat.BrainExtractionCheckAxial.png -a 0.5 -t -1x-1 -d 2 -p mask -s [5,mask,mask] -x ${tmpDir}/highRes_BrainRBGstep.nii.gz -f 0x1
 	CreateTiledMosaic -i ${antDir}/${antPre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/highRes_BrainRBG.nii.gz -o ${QADir}/anat.BrainExtractionCheckSag.png -a 0.5 -t -1x-1 -d 0 -p mask -s [5,mask,mask] -x ${tmpDir}/highRes_BrainRBGstep.nii.gz -f 0x1
@@ -128,7 +128,7 @@ if [[ ! -f ${freeDir}/surf/rh.pial ]];then
 	echo "#########################################################################################################"
 	echo ""
 	mksubjdirs FreeSurfer
-	mri_convert ${antDir}/${antPre}Brain.nii.gz ${freeDir}/mri/001.mgz
+	mri_convert ${antDir}/${antPre}ExtractedBrain0N4.nii.gz ${freeDir}/mri/001.mgz
 	#Run 
 	recon-all -autorecon1 -noskullstrip -s FreeSurfer -openmp $threads
 	cp ${freeDir}/mri/T1.mgz ${freeDir}/mri/brainmask.auto.mgz
@@ -157,6 +157,6 @@ fi
 #cleanup
 #mv highRes_* antCT/ #pipeNotes: add more deletion and clean up to minimize space, think about deleting Freesurfer and some of SUMA output
 rm -r ${antDir}/tmp ${freeDir}/bem ${freeDir}/label ${freeDir}/morph ${freeDir}/mpg ${freeDir}/mri ${freeDir}/rgb ${freeDir}/src ${freeDir}/surf ${freeDir}/tiff ${freeDir}/tmp ${freeDir}/touch ${freeDir}/trash
-rm ${antDir}/${antPre}BrainNormalizedToTemplate.nii.gz ${antDir}/${antPre}TemplateToSubject* ${antDir}/${antPre}rWarped.nii.gz
+rm ${antDir}/${antPre}BrainNormalizedToTemplate.nii.gz ${antDir}/${antPre}TemplateToSubject*
 gzip ${freeDir}/SUMA/*.nii 
  

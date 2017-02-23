@@ -11,6 +11,7 @@
 ###########!!!!!!!!!Pipeline to do!!!!!!!!!!!!!#############
 #1) make citations #citations
 #2) Follow up on #pipeNotes using ctrl f pipeNotes.... Made these when I knew a trick or something I needed to do later
+#3) Handle LOG in more organized way
 ###########!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!##########################
 
 ###############################################################################
@@ -20,27 +21,17 @@
 ###############################################################################
 
 sub=$1 #20161103_214449 #$1 or flag -s  #pipenotes= Change away from HardCoding later
-task=rest #$2 or flag -t #pipenotes= Change away from HardCoding later
-epi=$2 #/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Data/Func/20161103_21449/run005_04/*.hdr #pipenotes= Change away from HardCoding later
+task=$2 #$2 or flag -t #pipenotes= Change away from HardCoding later
 subDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/pipeTest/${sub}/ #pipenotes= Change away from HardCoding later
 outDir=${subDir}/${task}
 tmpDir=${outDir}/tmp
 QADir=${subDir}/QA
 antDir=${subDir}/antCT
 antPre="highRes_" #pipenotes= Change away from HardCoding later
-templateDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/Max/templates/dunedin98_antCT #pipenotes= update/Change away from HardCoding later
-templatePre=dunedin98Template_MNI_ #pipenotes= update/Change away from HardCoding later
+templateDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/templates/DNS500 #pipenotes= update/Change away from HardCoding later
+templatePre=DNS500template_MNI_ #pipenotes= update/Change away from HardCoding later
 threads=1 #default in case thread arg is not passed
 threads=$3
-
-export PATH=$PATH:/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/Pipelines/scripts/ #add dependent scripts to path #pipenotes= update/Change to DNS scripts
-export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$threads
-export OMP_NUM_THREADS=$threads
-##Set up directory
-mkdir -p $QADir
-mkdir -p $outDir
-mkdir $tmpDir
-cd $outDir
 
 if [[ ! -f ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ]];then
 	echo ""
@@ -50,18 +41,79 @@ if [[ ! -f ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ]];then
 	echo ""
 	exit
 fi
+
+
 ###############################################################################
 #
 # Main 
 #
 ###############################################################################
 
+##Grab Epi and set up directories
+
+if [[ $task == "faces" ]];then
+	EpiPre=$(grep $sub /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/All_Imaging/DataLocations.csv | cut -d "," -f8)
+	expLen=196
+elif [[ $task == "cards" ]];then
+	EpiPre=$(grep $sub /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/All_Imaging/DataLocations.csv | cut -d "," -f9)
+	expLen=172
+elif [[ $task == "numLS" ]];then
+	EpiPre=$(grep $sub /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/All_Imaging/DataLocations.csv | cut -d "," -f10)
+	expLen=354
+elif [[ $task == "facename" ]];then
+	EpiPre=$(grep $sub /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/All_Imaging/DataLocations.csv | cut -d "," -f11)
+	expLen=162	
+else
+		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!EPI task Name does not match faces, cards, numLS or facename!!!!!!!!!!!!!!!!!!!!!!"
+		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!EXITING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+		exit
+fi
+if [[ $EpiPre == "not_collected" ]];then
+	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+	echo "!!!!!!!!!!!!!!!!!!!!!NO T1, skipping Anat Processing and Epi processing will also be unavailable!!!!!!!!!!!!!!!"
+	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!EXITING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+	exit
+fi
+epi=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/${EpiPre}
+export PATH=$PATH:/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/Pipelines/scripts/ #add dependent scripts to path #pipenotes= update/Change to DNS scripts
+export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$threads
+export OMP_NUM_THREADS=$threads
+##Set up directory
+mkdir -p $QADir
+mkdir -p $outDir
+mkdir $tmpDir
+cd $outDir
+####Put together TRs into full dataset and leave off last TR of cards and faces per Annchen's request
+if [[ $task == "faces" ]];then
+	3dTcat -prefix ${tmpDir}/epi.nii.gz -tpattern altplus -relabel -tr 2 ${epi}/V00*.hdr ${epi}/*V01[012345678]*.hdr ${epi}/V019[012345].hdr
+elif [[ $task == "cards" ]];then
+	3dTcat -prefix ${tmpDir}/epi.nii.gz -tpattern altplus -relabel -tr 2 ${epi}/V00*.hdr ${epi}/*V01[0123456]*.hdr ${epi}/V017[01].hdr
+else
+	3dTcat -prefix ${tmpDir}/epi.nii.gz -tpattern altplus -relabel -tr 2 ${epi}/V*.hdr #Combine each TR into one dataset
+fi
+
+expLen2=$(echo "$expLen-1" | bc)
+###Check to make sure T1 has correct number of slices other exit and complain
+lenEpi=$(ls ${epi}/*.hdr | wc -l)
+if [[ $lenEpi == $expLen || $lenEpi == $expLen2 ]];then
+	echo "Epi matches the assumed length"
+else
+	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!T1 is the Wrong Size, wrong number of slices!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!EXITING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+	exit
+fi
+
 echo ""
 echo "#########################################################################################################"
 echo "#########################################Prep epi for warping############################################"
 echo "#########################################################################################################"
 echo ""
-3dTcat -prefix ${tmpDir}/epi.nii.gz -tpattern altplus -relabel -tr 2 ${epi}/V*.hdr #Combine each TR into one dataset
+
 ###Resample structural to voxel dimensions of epi for grid when applying warps
 3dDespike -prefix ${tmpDir}/epi_d.nii.gz ${tmpDir}/epi.nii.gz #citation:Jo et al., 2014 #pipeNotes: do we want to do this on tasks?? #citation: Kalcher et al., 2013. Example of despiking in task analysis...at least some people do this... #citation: also https://afni.nimh.nih.gov/afni/community/board/read.php?1,141185,143682#msg-143682, small comment "helpful, more important in rest than task" 
 3dTshift -tpattern altplus -prefix ${tmpDir}/epi_dt.nii.gz ${tmpDir}/epi_d.nii.gz #perform t-shifting
@@ -70,7 +122,7 @@ echo ""
 3dcalc -a ${tmpDir}/epi_ExtractionMask.nii.gz -b ${tmpDir}/epi_dtv.nii.gz -expr 'a*b' -prefix ${tmpDir}/epi_dtvb.nii.gz #extract brain
 3dTstat -prefix ${tmpDir}/epi_dtvbm.nii.gz ${tmpDir}/epi_dtvb.nii.gz # Create mean image for more robust alignment to sub T1
 N4BiasFieldCorrection -i ${tmpDir}/epi_dtvbm.nii.gz #Correct image non-uniformities in mean(not analyzed just for registration) to improve coregistration
-N4BiasFieldCorrection -i ${antDir}/${antPre}Brain.nii.gz
+N4BiasFieldCorrection -i ${antDir}/${antPre}ExtractedBrain0N4.nii.gz
 
 echo ""
 echo "#########################################################################################################"
@@ -78,8 +130,7 @@ echo "###################Calculates Warps to align epi to template via subjects 
 echo "#########################################################################################################"
 echo ""
 
-antsRegistrationSyN.sh -d 3 -m ${tmpDir}/epi_dtvbm.nii.gz -f ${antDir}/${antPre}Brain.nii.gz -t r -n 1 -o ${outDir}/epi2highRes #Might want to keep for Surface Processing Purposes
-antsRegistrationSyN.sh -d 3 -m ${tmpDir}/epi_dtvbm.nii.gz -f ${antDir}/${antPre}Brain.nii.gz -t a -n 1 -o ${outDir}/epi2highResAff #Might want to keep for Surface Processing Purposes
+antsRegistrationSyN.sh -d 3 -m ${tmpDir}/epi_dtvbm.nii.gz -f ${antDir}/${antPre}ExtractedBrain0N4.nii.gz -t r -n $threads -o ${outDir}/epi2highRes #Might want to keep for Surface Processing Purposes
 voxSize=$(@GetAfniRes ${tmpDir}/epi.nii.gz)
 3dresample -input ${templateDir}/${templatePre}Brain.nii.gz -dxyz $voxSize -prefix ${tmpDir}/refTemplate4epi.nii.gz
 
@@ -87,11 +138,11 @@ voxSize=$(@GetAfniRes ${tmpDir}/epi.nii.gz)
 ##Used WarpTimeSeries instead of AntsApplyTransforms because it worked with 4d time series and I couldn't get applyTransforms to. But when applying each method to the mean image gave perfectly identical results
 #pipeNotes: Think about using NearestNeighbor in applying warps, thats what michael did, and you could ask him why if needed
 WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_dtvbm.nii.gz ${tmpDir}/epiWarpedMean.nii.gz -R ${tmpDir}/refTemplate4epi.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${outDir}/epi2highRes0GenericAffine.mat
-WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_dtvb.nii.gz ${outDir}/epiWarped.nii.gz -R ${tmpDir}/refTemplate4epi.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${outDir}/epi2highRes0GenericAffine.mat
-WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_dtvb.nii.gz ${outDir}/epiWarpedNN.nii.gz -R ${tmpDir}/refTemplate4epi.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${outDir}/epi2highRes0GenericAffine.mat --use-NN #pipeNotes: eventually remove this or linear interpolation from above
-WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_dtvbm.nii.gz ${tmpDir}/epiWarpedMeanAff.nii.gz -R ${tmpDir}/refTemplate4epi.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${outDir}/epi2highResAff0GenericAffine.mat
+WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_dtvb.nii.gz ${outDir}/epiWarped.nii.gz -R ${tmpDir}/refTemplate4epi.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${outDir}/epi2highRes0GenericAffine.mat --use-NN #pipeNotes: eventually remove this or linear interpolation from above
 3drefit -space MNI -view tlrc ${outDir}/epiWarped.nii.gz #Refit space of warped epi so that it can be viewed in MNI space within AFNI
-3drefit -space MNI -view tlrc ${tmpDir}/epiWarpedMeanAff.nii.gz #Refit space of warped epi so that it can be viewed in MNI space within AFNI
+
+#####Smooth Data to 10mm
+3dBlurInMask -input ${outDir}/epiWarped.nii.gz -Mmask ${templateDir}/DNS500_first50_BlurMask10_EpiVox.nii.gz -FWHM 6 -prefix ${outDir}/epiWarped_blur6mm.nii.gz
 
 echo ""
 echo "#########################################################################################################"
@@ -131,9 +182,10 @@ numCenFD50=$(cat ${outDir}/FD.5TRs.1D | wc -l)
 FD25Per=$(echo "${numCenFD25}/${nVols}" | bc -l | cut -c1-5)
 FD50Per=$(echo "${numCenFD50}/${nVols}" | bc -l | cut -c1-5)
 #spatial correlations between epi and highres, epi and Template, and highRes and template as a crude index of alignment quality
+antsApplyTransforms -d 3 -i ${antDir}/${antPre}ExtractedBrain0N4.nii.gz -o ${tmpDir}/BrainNormalizedToTemplate.nii.gz -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -r ${antDir}/${antPre}ExtractedBrain0N4.nii.gz
 epi2TemplateCor=$(3ddot -mask ${tmpDir}/refTemplateBrainMask.nii.gz ${tmpDir}/refTemplate4epi.nii.gz ${tmpDir}/epiWarpedMean.nii.gz | sed "s/ *//g" | sed "s/\t\t*//g" )
-epi2highResCor=$(3ddot -mask ${antDir}/${antPre}BrainExtractionMask.nii.gz ${antDir}/${antPre}Brain.nii.gz ${outDir}/epi2highResWarped.nii.gz | sed "s/ *//g"| sed "s/\t\t*//g")
-highRes2TemplateCor=$(3ddot -mask ${templateDir}/${templatePre}BrainExtractionMask.nii.gz  ${antDir}/${antPre}BrainNormalizedToTemplate.nii.gz ${templateDir}/${templatePre}Brain.nii.gz | sed "s/ *//g" | sed "s/\t\t*//g")
+epi2highResCor=$(3ddot -mask ${antDir}/${antPre}BrainExtractionMask.nii.gz ${antDir}/${antPre}ExtractedBrain0N4.nii.gz ${outDir}/epi2highResWarped.nii.gz | sed "s/ *//g"| sed "s/\t\t*//g")
+highRes2TemplateCor=$(3ddot -mask ${templateDir}/${templatePre}BrainExtractionMask.nii.gz  ${tmpDir}/BrainNormalizedToTemplate.nii.gz ${templateDir}/${templatePre}Brain.nii.gz | sed "s/ *//g" | sed "s/\t\t*//g")
 #set up QC table for subject
 echo "tSNR,rawFWHM,warpedFWHM,FDavg,FDsd,DVARSavg,DVARSsd,FD25Per,FD50Per,epi2TemplateCor,epi2highResCor,highRes2TemplateCor" > ${QADir}/${task}.QCmeasures.txt
 echo "$tSNR,$rawFWHM,$warpedFWHM,$FDavg,$FDsd,$DVARSavg,$DVARSsd,$FD25Per,$FD50Per,$epi2TemplateCor,$epi2highResCor,$highRes2TemplateCor" >> ${QADir}/${task}.QCmeasures.txt
@@ -143,13 +195,8 @@ echo "$tSNR,$rawFWHM,$warpedFWHM,$FDavg,$FDsd,$DVARSavg,$DVARSsd,$FD25Per,$FD50P
 ConvertScalarImageToRGB 3 ${tmpDir}/epi2highResWarpedEdges.nii.gz ${tmpDir}/epi2highResEdgesRBG.nii.gz none red none 0 10 #convert for Ants Montage
 3dcalc -a ${tmpDir}/epi2highResEdgesRBG.nii.gz -expr 'step(a)' -prefix ${tmpDir}/epi2highResEdgesRBGstep.nii.gz #Make mask to make Edges stand out
 CreateTiledMosaic -i ${antDir}/${antPre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/epi2highResEdgesRBG.nii.gz -o ${QADir}/${task}.epi2HighResAlignmentCheck.png -a 0.8 -t -1x-1 -d 2 -p mask -s [5,mask,mask] -x ${tmpDir}/epi2highResEdgesRBGstep.nii.gz -f 0x1  #Create Montage taking images in axial slices every 5 slices
-##epi Alignment to HighRes
-3dedge3 -input ${outDir}/epi2highResAffWarped.nii.gz -prefix ${tmpDir}/epi2highResAffWarpedEdges.nii.gz  #Detect edges
-ConvertScalarImageToRGB 3 ${tmpDir}/epi2highResAffWarpedEdges.nii.gz ${tmpDir}/epi2highResAffEdgesRBG.nii.gz none red none 0 10 #convert for Ants Montage
-3dcalc -a ${tmpDir}/epi2highResAffEdgesRBG.nii.gz -expr 'step(a)' -prefix ${tmpDir}/epi2highResAffEdgesRBGstep.nii.gz #Make mask to make Edges stand out
-CreateTiledMosaic -i ${antDir}/${antPre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/epi2highResAffEdgesRBG.nii.gz -o ${QADir}/${task}.epi2HighResAffAlignmentCheck.png -a 0.8 -t -1x-1 -d 2 -p mask -s [5,mask,mask] -x ${tmpDir}/epi2highResAffEdgesRBGstep.nii.gz -f 0x1  #Create Montage taking images in axial slices every 5 slices
 ##HighRes Alignment to Template
-3dedge3 -input ${antDir}/${antPre}BrainNormalizedToTemplate.nii.gz -prefix ${tmpDir}/highRes2TemplateWarpedEdges.nii.gz  #Detect edges
+3dedge3 -input ${tmpDir}/BrainNormalizedToTemplate.nii.gz -prefix ${tmpDir}/highRes2TemplateWarpedEdges.nii.gz  #Detect edges
 ConvertScalarImageToRGB 3 ${tmpDir}/highRes2TemplateWarpedEdges.nii.gz ${tmpDir}/highRes2TemplateEdgesRBG.nii.gz none red none 0 10 #convert for Ants Montage
 3dcalc -a ${tmpDir}/highRes2TemplateEdgesRBG.nii.gz -expr 'step(a)' -prefix ${tmpDir}/highRes2TemplateEdgesRBGstep.nii.gz #Make mask to make Edges stand out
 CreateTiledMosaic -i ${templateDir}/${templatePre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/highRes2TemplateEdgesRBG.nii.gz -o ${QADir}/${task}.highRes2TemplateAlignmentCheck.png -a 0.8 -t -1x-1 -d 2 -p mask -s [5,mask,mask] -x ${tmpDir}/highRes2TemplateEdgesRBGstep.nii.gz -f 0x1  #Create Montage taking images in axial slices every 5 slices
@@ -159,6 +206,11 @@ WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_dtvbm.nii.gz ${tmpDir}/epiWarp
 ConvertScalarImageToRGB 3 ${tmpDir}/epi2TemplateWarpedEdges.nii.gz ${tmpDir}/epi2TemplateEdgesRBG.nii.gz none red none 0 10 #convert for Ants Montage
 3dcalc -a ${tmpDir}/epi2TemplateEdgesRBG.nii.gz -expr 'step(a)' -prefix ${tmpDir}/epi2TemplateEdgesRBGstep.nii.gz #Make mask to make Edges stand out
 CreateTiledMosaic -i ${templateDir}/${templatePre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/epi2TemplateEdgesRBG.nii.gz -o ${QADir}/${task}.epi2TemplateAlignmentCheck.png -a 0.8 -t -1x-1 -d 2 -p mask -s [5,mask,mask] -x ${tmpDir}/epi2TemplateEdgesRBGstep.nii.gz -f 0x1  #Create Montage taking images in axial slices every 5 slices
+##epi edges on epi to see how edge detection worked
+3dedge3 -input ${tmpDir}/epi_dtvbm.nii.gz -prefix ${tmpDir}/epiMeanEdges.nii.gz  #Detect edges
+ConvertScalarImageToRGB 3 ${tmpDir}/epiMeanEdges.nii.gz ${tmpDir}/epiMeanEdgesRBG.nii.gz none red none 0 10 #convert for Ants Montage
+3dcalc -a ${tmpDir}/epiMeanEdgesRBG.nii.gz -expr 'step(a)' -prefix ${tmpDir}/epiMeanEdgesRBGstep.nii.gz #Make mask to make Edges stand out
+CreateTiledMosaic -i ${tmpDir}/epi_dtvbm.nii.gz -r ${tmpDir}/epiMeanEdgesRBG.nii.gz -o ${QADir}/${task}.epiMeanEdgesAlignmentCheck.png -a 0.8 -t -1x-1 -d 2 -p mask -s [1,mask,mask] -x ${tmpDir}/epiMeanEdgesRBGstep.nii.gz -f 0x0  #Create Montage taking images in axial slices every 5 slices
 
 ##Clean up
 #rm -r $tmpDir
