@@ -45,7 +45,7 @@ fi
 ###Check if this subject and task have already been processed
 if [[ -f ${outDir}/epiWarped.nii.gz ]];then
 	echo ""
-	echo "!!!!!!!!!!!!!!!!!!!!!jects $task data is already processed!!!!!!!!!!!!!!!!!!!!!!!!!"
+	echo "!!!!!!!!!!!!!!!!!!!!!$sub $task data is already processed!!!!!!!!!!!!!!!!!!!!!!!!!"
 	echo "!!!!!!!!!!!!delete $outDir and rerun this script if you want to reprocess!!!!!!!!!!"
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!EXITING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 	echo ""
@@ -140,7 +140,6 @@ echo ""
 ###Resample structural to voxel dimensions of epi for grid when applying warps
 3dDespike -prefix ${tmpDir}/epi_d.nii.gz ${tmpDir}/epi.nii.gz #citation:Jo et al., 2014 #pipeNotes: do we want to do this on tasks?? #citation: Kalcher et al., 2013. Example of despiking in task analysis...at least some people do this... #citation: also https://afni.nimh.nih.gov/afni/community/board/read.php?1,141185,143682#msg-143682, small comment "helpful, more important in rest than task" 
 3dTshift -tpattern altplus -prefix ${tmpDir}/epi_dt.nii.gz ${tmpDir}/epi_d.nii.gz #perform t-shifting
-##Pipenotes: Should you apply the rigid warp field from rest1 to rest2 data instead of re-rigid warping??
 if [[ $task == "rest2" ]];then
 	3dvolreg -base ${subDir}/rest1/restVolRegBase.nii.gz -prefix ${tmpDir}/epi_dtv.nii.gz -1Dfile ${outDir}/motion.1D ${tmpDir}/epi_dt.nii.gz # volume registation and extraction of motion trace with Same base as rest1
 else
@@ -181,12 +180,12 @@ voxSize=$(@GetAfniRes ${tmpDir}/epi.nii.gz)
 ##Used WarpTimeSeries instead of AntsApplyTransforms because it worked with 4d time series and I couldn't get applyTransforms to. But when applying each method to the mean image gave perfectly identical results
 ###If task is rest 2 then you want to apply the rigid epi to high rest transform from rest1 so that they are exactly the same
 if [[ $task != "rest2" ]];then
-	WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_dtvbm.nii.gz ${tmpDir}/epiWarpedMean.nii.gz -R ${tmpDir}/refTemplate4epi.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${outDir}/epi2highRes0GenericAffine.mat
-	WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_dtvb.nii.gz ${outDir}/epiWarped.nii.gz -R ${tmpDir}/refTemplate4epi.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${outDir}/epi2highRes0GenericAffine.mat --use-NN #pipeNotes: eventually remove this or linear interpolation from above
+	WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_dtvbm.nii.gz ${tmpDir}/epiWarpedMean.nii.gz -R ${tmpDir}/refTemplate4epi.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${outDir}/epi2highRes0GenericAffine.mat --use-NN 
+	WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_dtvb.nii.gz ${outDir}/epiWarped.nii.gz -R ${tmpDir}/refTemplate4epi.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${outDir}/epi2highRes0GenericAffine.mat --use-NN
 	3drefit -space MNI -view tlrc ${outDir}/epiWarped.nii.gz #Refit space of warped epi so that it can be viewed in MNI space within AFNI
 else
-	WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_dtvbm.nii.gz ${tmpDir}/epiWarpedMean.nii.gz -R ${tmpDir}/refTemplate4epi.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat $${subDir}/rest1/epi2highRes0GenericAffine.mat
-	WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_dtvb.nii.gz ${outDir}/epiWarped.nii.gz -R ${tmpDir}/refTemplate4epi.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${subDir}/rest1/epi2highRes0GenericAffine.mat --use-NN #pipeNotes: eventually remove this or linear interpolation from above
+	WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_dtvbm.nii.gz ${tmpDir}/epiWarpedMean.nii.gz -R ${tmpDir}/refTemplate4epi.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat $${subDir}/rest1/epi2highRes0GenericAffine.mat --use-NN 
+	WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_dtvb.nii.gz ${outDir}/epiWarped.nii.gz -R ${tmpDir}/refTemplate4epi.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${subDir}/rest1/epi2highRes0GenericAffine.mat --use-NN 
 	3drefit -space MNI -view tlrc ${outDir}/epiWarped.nii.gz #Refit space of warped epi so that it can be viewed in MNI space within AFNI
 fi
 #####Smooth Data 6mm will get output to about 11-13 FWHM on average
@@ -251,9 +250,9 @@ ConvertScalarImageToRGB 3 ${tmpDir}/highRes2TemplateWarpedEdges.nii.gz ${tmpDir}
 CreateTiledMosaic -i ${templateDir}/${templatePre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/highRes2TemplateEdgesRBG.nii.gz -o ${QADir}/${task}.highRes2TemplateAlignmentCheck.png -a 0.8 -t -1x-1 -d 2 -p mask -s [5,mask,mask] -x ${tmpDir}/highRes2TemplateEdgesRBGstep.nii.gz -f 0x1  #Create Montage taking images in axial slices every 5 slices
 ##epiWarpedMean to Template
 if [[ $task != "rest2" ]];then
-	WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_dtvbm.nii.gz ${tmpDir}/epiWarpedMeanTempRef.nii.gz -R ${templateDir}/${templatePre}BrainSegmentation0N4.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${outDir}/epi2highRes0GenericAffine.mat #Get overlay on the same grid
+	WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_dtvbm.nii.gz ${tmpDir}/epiWarpedMeanTempRef.nii.gz -R ${templateDir}/${templatePre}BrainSegmentation0N4.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${outDir}/epi2highRes0GenericAffine.mat --use-NN #Get overlay on the same grid
 else
-	WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_dtvbm.nii.gz ${tmpDir}/epiWarpedMeanTempRef.nii.gz -R ${templateDir}/${templatePre}BrainSegmentation0N4.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${subDir}/rest1/epi2highRes0GenericAffine.mat #Get overlay on the same grid
+	WarpTimeSeriesImageMultiTransform 4 ${tmpDir}/epi_dtvbm.nii.gz ${tmpDir}/epiWarpedMeanTempRef.nii.gz -R ${templateDir}/${templatePre}BrainSegmentation0N4.nii.gz ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat ${subDir}/rest1/epi2highRes0GenericAffine.mat --use-NN #Get overlay on the same grid
 fi
 3dedge3 -input ${tmpDir}/epiWarpedMeanTempRef.nii.gz -prefix ${tmpDir}/epi2TemplateWarpedEdges.nii.gz  #Detect edges
 ConvertScalarImageToRGB 3 ${tmpDir}/epi2TemplateWarpedEdges.nii.gz ${tmpDir}/epi2TemplateEdgesRBG.nii.gz none red none 0 10 #convert for Ants Montage

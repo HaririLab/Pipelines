@@ -28,12 +28,12 @@ outDir=${subDir}/rest
 tmpDir=${outDir}/tmp
 minProcEpi1=${outDir}/rest1/epiWarped.nii.gz
 minProcEpi2=${outDir}/rest2/epiWarped.nii.gz
-templateDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/Max/templates/dunedin98_antCT #pipenotes= update/Change away from HardCoding later
-templatePre=dunedin98Template_MNI_ #pipenotes= update/Change away from HardCoding later
+templateDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/templates/DNS500 #pipenotes= update/Change away from HardCoding later
+templatePre=DNS500template_MNI_  #pipenotes= update/Change away from HardCoding later
 antDir=${subDir}/antCT
 antPre="highRes_" #pipenotes= Change away from HardCoding later
 FDthresh=.25 #pipenotes= Change away from HardCoding later, also find citations for what you decide likely power 2014, minimun of .5 fd 20DVARS suggested
-DVARSthresh=1.5 #pipenotes= Change away from HardCoding later, also find citations for what you decide
+DVARSthresh=1.55 #pipenotes= Change away from HardCoding later, also find citations for what you decide
 
 mkdir -p $tmpDir
 ##Nest minProc within overarching rest directory
@@ -80,7 +80,7 @@ for restNum in $(seq 1 $numRest);do
 	####Setup Censoring
 	cenTRdelta=$(echo "($restNum - 1)*${numTR}" | bc)
 	awk -v thresh=$FDthresh '{if($1 > thresh) print NR}' ${outDir}/rest${restNum}/FD.1D | awk '{print ($1 - 1) " " $2}' > ${tmpDir}/raw${restNum}FDcensorTRs.1D #find TRs above threshold and subtract 1 from list to 0 index for afni's liking
-	awk -v thresh=$DVARSthresh '{if($1 > thresh) print NR}' ${outDir}/rest${restNum}/DVARS.1D | awk '{print ($1 - 1) " " $2}' > ${tmpDir}/raw${restNum}DVARScensorTRs.1D #find TRs above threshold and subtract 1 from list to 0 index for afni's liking
+	awk -v thresh=$DVARSthresh '{if($1 > thresh) print NR}' ${outDir}/rest${restNum}/DVARS.1D | awk '{print ($1) " " $2}' > ${tmpDir}/raw${restNum}DVARScensorTRs.1D #find TRs above threshold and Don't subtract 1 from list because DVARS is based on change from first TR and has one less value, value 1 will therefore be for afni 1 index (TR number 2)
 	1deval -a ${tmpDir}/raw${restNum}FDcensorTRs.1D -expr "a+$cenTRdelta" > ${outDir}/FDcensorTRs${restNum}.1D
 	1deval -a ${tmpDir}/raw${restNum}DVARScensorTRs.1D -expr "a+$cenTRdelta" > ${outDir}/DVARScensorTRs${restNum}.1D
 done
@@ -94,10 +94,13 @@ cat ${outDir}/pcRest*.wm.csf_vec.1D > ${outDir}/allCompCorr.1D
 ####Project everything out
 clist=$(cat ${outDir}/censorTRs.1D)
 lenC=$(echo $clist | wc -w )
+##pipeNotes: consider Changing GM mask to one based on all subjects eventually, the all Caucasian with 570 subs should be fine
 if [[ $lenC == 0 ]];then
-	3dTproject -input ${outDir}/rest*/epiWarped.nii.gz -prefix ${outDir}/epiPrepped.nii.gz -ort ${outDir}/allmotion.1D -ort ${outDir}/allmotion_deriv.1D -ort ${outDir}/allCompCorr.1D -polort 1 -bandpass 0.008 0.10 -blur 6 ##pipeNotes: add in mask based on subjects GM warped to template and thresholded and make sure epis are read in in the correct order
+	3dTproject -input ${outDir}/rest*/epiWarped.nii.gz -mask ${templateDir}/DNS500_cauc568_BlurMask10_EpiVox.nii.gz -prefix ${tmpDir}/epiPrepped.nii.gz -ort ${outDir}/allmotion.1D -ort ${outDir}/allmotion_deriv.1D -ort ${outDir}/allCompCorr.1D -polort 1 -bandpass 0.008 0.10
+	3dBlurInMask -input ${tmpDir}/epiPrepped.nii.gz -Mmask ${templateDir}/DNS500_first50_BlurMask10_EpiVox.nii.gz -FWHM 6 -prefix ${outDir}/restPrepped_blur6mm.nii.gz #Blur in same mask as task blurring 3dtproject will only do normal blurring but same argument for blurring in mask applies to rest
 else
-	3dTproject -input ${outDir}/rest*/epiWarped.nii.gz -prefix ${outDir}/epiPrepped.nii.gz -CENSORTR $clist -ort ${outDir}/allmotion.1D -ort ${outDir}/allmotion_deriv.1D -ort ${outDir}/allCompCorr.1D -polort 1 -bandpass 0.008 0.10 -blur 6 ##pipeNotes: add in mask based on subjects GM warped to template and thresholded and make sure epis are read in in the correct order
+	3dTproject -input ${outDir}/rest*/epiWarped.nii.gz -mask ${templateDir}/DNS500_cauc568_BlurMask10_EpiVox.nii.gz -prefix ${tmpDir}/epiPrepped.nii.gz -CENSORTR $clist -ort ${outDir}/allmotion.1D -ort ${outDir}/allmotion_deriv.1D -ort ${outDir}/allCompCorr.1D -polort 1 -bandpass 0.008 0.10
+	3dBlurInMask -input ${tmpDir}/epiPrepped.nii.gz -Mmask ${templateDir}/DNS500_first50_BlurMask10_EpiVox.nii.gz -FWHM 6 -prefix ${outDir}/restPrepped_blur6mm.nii.gz
 fi
 
 
