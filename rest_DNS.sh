@@ -23,7 +23,7 @@
 #
 ###############################################################################
 sub=$1
-subDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/pipeTest/${sub}
+subDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/All_Imaging/${sub}
 outDir=${subDir}/rest
 tmpDir=${outDir}/tmp
 minProcEpi1=${outDir}/rest1/epiWarped.nii.gz
@@ -98,9 +98,10 @@ lenC=$(echo $clist | wc -w )
 if [[ $lenC == 0 ]];then
 	3dTproject -input ${outDir}/rest*/epiWarped.nii.gz -mask ${templateDir}/DNS500_cauc568_BlurMask10_EpiVox.nii.gz -prefix ${tmpDir}/epiPrepped.nii.gz -ort ${outDir}/allmotion.1D -ort ${outDir}/allmotion_deriv.1D -ort ${outDir}/allCompCorr.1D -polort 1 -bandpass 0.008 0.10
 	3dBlurInMask -input ${tmpDir}/epiPrepped.nii.gz -Mmask ${templateDir}/DNS500_first50_BlurMask10_EpiVox.nii.gz -FWHM 6 -prefix ${outDir}/restPrepped_blur6mm.nii.gz #Blur in same mask as task blurring 3dtproject will only do normal blurring but same argument for blurring in mask applies to rest
+	3dBlurInMask -input ${tmpDir}/epiPrepped.nii.gz -FWHM 6 -prefix ${outDir}/restPrepped_blur6mmNoMask.nii.gz ###Still not completely convinced by blurInMask
 else
 	3dTproject -input ${outDir}/rest*/epiWarped.nii.gz -mask ${templateDir}/DNS500_cauc568_BlurMask10_EpiVox.nii.gz -prefix ${tmpDir}/epiPrepped.nii.gz -CENSORTR $clist -ort ${outDir}/allmotion.1D -ort ${outDir}/allmotion_deriv.1D -ort ${outDir}/allCompCorr.1D -polort 1 -bandpass 0.008 0.10
-	3dBlurInMask -input ${tmpDir}/epiPrepped.nii.gz -Mmask ${templateDir}/DNS500_first50_BlurMask10_EpiVox.nii.gz -FWHM 6 -prefix ${outDir}/restPrepped_blur6mm.nii.gz
+	3dBlurInMask -input ${tmpDir}/epiPrepped.nii.gz -FWHM 6 -prefix ${outDir}/restPrepped_blur6mmNoMask.nii.gz ###Still not completely convinced by blurInMask
 fi
 
 

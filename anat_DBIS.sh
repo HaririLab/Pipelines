@@ -25,11 +25,11 @@ sub=$1 #$1 or flag -s  #20161103_21449 #pipenotes= Change away from HardCoding l
 subDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/${sub} #pipenotes= Change away from HardCoding later
 QADir=${subDir}/QA
 antDir=${subDir}/antCT
-freeDir=${subDir}/FreeSurfer
+freeDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FS_${sub}
 tmpDir=${antDir}/tmp
 antPre="highRes_" #pipenotes= Change away from HardCoding later
-templateDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/Max/templates/dunedin98_antCT #pipenotes= update/Change away from HardCoding later
-templatePre=dunedin98Template_MNI #pipenotes= update/Change away from HardCoding later
+templateDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/Max/templates/DBIS115 #pipenotes= update/Change away from HardCoding later
+templatePre=dunedin115template_MNI #pipenotes= update/Change away from HardCoding later
 #T1=$2 #/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Data/Anat/20161103_21449/bia5_21449_006.nii.gz #pipenotes= update/Change away from HardCoding later
 threads=1 #default in case thread argument is not passed
 threads=$2
@@ -52,7 +52,6 @@ mkdir -p $QADir
 cd $subDir
 mkdir -p $antDir
 mkdir -p $tmpDir
-SUBJECTS_DIR=${subDir} #pipenotes= update/Change away from HardCoding later also figure out FS_AVG stuff
 
 if [[ ! -f ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate.nii.gz ]];then
 	sizeT1=$(@GetAfniRes ${T1})
@@ -102,13 +101,22 @@ if [[ ! -f ${freeDir}/surf/rh.pial ]];then
 	echo "#####################################FreeSurfer Surface Generation#######################################"
 	echo "#########################################################################################################"
 	echo ""
-	mksubjdirs FreeSurfer
-	mri_convert ${antDir}/${antPre}ExtractedBrain0N4.nii.gz ${freeDir}/mri/001.mgz
+	export SUBJECTS_DIR=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/
+	#mksubjdirs FreeSurfer
+	#3dcalc -a ${antDir}/${antPre}rWarped.nii.gz -b ${antDir}/${antPre}BrainExtractionMask.nii.gz -expr 'a*b' -prefix ${antDir}/${antPre}ExtractedBrain.nii.gz
+	#mri_convert ${antDir}/${antPre}ExtractedBrain.nii.gz ${freeDir}/mri/001.mgz
+	#mri_convert $T1 ${freeDir}/mri/001.mgz
+	##Set up options file to allow for sub mm voxel high res run of FreeSurfer
+	echo "mris_inflate -n 15" > ${tmpDir}/expert.opts
 	#Run 
-	recon-all -autorecon1 -noskullstrip -s FreeSurfer -openmp $threads
-	cp ${freeDir}/mri/T1.mgz ${freeDir}/mri/brainmask.auto.mgz
-	cp ${freeDir}/mri/brainmask.auto.mgz ${freeDir}/mri/brainmask.mgz
-	recon-all -autorecon2 -autorecon3 -s FreeSurfer -openmp $threads
+	#recon-all -autorecon1 -noskullstrip -s FreeSurfer -openmp $threads -hires -expert ${tmpDir}/expert.opts
+	#cp ${freeDir}/mri/T1.mgz ${freeDir}/mri/brainmask.auto.mgz
+	#cp ${freeDir}/mri/brainmask.auto.mgz ${freeDir}/mri/brainmask.mgz
+	#recon-all -autorecon2 -autorecon3 -s FreeSurfer -openmp $threads -hires #-expert ${tmpDir}/expert.opts -xopts-overwrite
+	cd /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/
+	recon-all -all -s FS_${sub} -openmp $threads -hires -i ${antDir}/${antPre}rWarped.nii.gz -expert ${tmpDir}/expert.opts
+	mkdir -p ${subDir}/FreeSurfer
+	mv /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FS_${sub} ${subDir}/FreeSurfer
 else
 	echo ""
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!Skipping FreeSurfer, Completed Previously!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -122,7 +130,7 @@ if [[ -f $FLAIR ]];then
 		echo "#####################################Cleanup of Surface With FLAIR#######################################"
 		echo "#########################################################################################################"
 		echo ""
-		recon-all -subject FreeSurfer -FLAIRpial -FLAIR $FLAIR -FLAIRpial -autorecon3 #citation: https://surfer.nmr.mgh.harvard.edu/fswiki/recon-all#UsingT2orFLAIRdatatoimprovepialsurfaces
+		recon-all -subject FreeSurfer -FLAIRpial -FLAIR $FLAIR -FLAIRpial -autorecon3 -openmp $threads #citation: https://surfer.nmr.mgh.harvard.edu/fswiki/recon-all#UsingT2orFLAIRdatatoimprovepialsurfaces
 		rm -r ${freeDir}/SUMA ##Removed because SUMA surface will be based on wrong pial if above ran
 	fi
 fi
