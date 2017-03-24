@@ -102,19 +102,16 @@ if [[ ! -f ${freeDir}/surf/rh.pial ]];then
 	echo "#########################################################################################################"
 	echo ""
 	export SUBJECTS_DIR=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/
-	#mksubjdirs FreeSurfer
-	#3dcalc -a ${antDir}/${antPre}rWarped.nii.gz -b ${antDir}/${antPre}BrainExtractionMask.nii.gz -expr 'a*b' -prefix ${antDir}/${antPre}ExtractedBrain.nii.gz
-	#mri_convert ${antDir}/${antPre}ExtractedBrain.nii.gz ${freeDir}/mri/001.mgz
-	#mri_convert $T1 ${freeDir}/mri/001.mgz
+	3dcalc -a ${antDir}/${antPre}rWarped.nii.gz -b ${antDir}/${antPre}BrainExtractionMask.nii.gz -expr 'a*b' -prefix ${antDir}/${antPre}ExtractedBrain.nii.gz
+	###Pipenotes: Currently not doing highRes processing. Can't get it to run without crashing. Also doesn't add that much to our voxels that are already near 1mm^3
 	##Set up options file to allow for sub mm voxel high res run of FreeSurfer
-	echo "mris_inflate -n 15" > ${tmpDir}/expert.opts
+	#echo "mris_inflate -n 15" > ${tmpDir}/expert.opts
 	#Run 
-	#recon-all -autorecon1 -noskullstrip -s FreeSurfer -openmp $threads -hires -expert ${tmpDir}/expert.opts
-	#cp ${freeDir}/mri/T1.mgz ${freeDir}/mri/brainmask.auto.mgz
-	#cp ${freeDir}/mri/brainmask.auto.mgz ${freeDir}/mri/brainmask.mgz
-	#recon-all -autorecon2 -autorecon3 -s FreeSurfer -openmp $threads -hires #-expert ${tmpDir}/expert.opts -xopts-overwrite
 	cd /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/
-	recon-all -all -s FS_${sub} -openmp $threads -hires -i ${antDir}/${antPre}rWarped.nii.gz -expert ${tmpDir}/expert.opts
+	recon-all -autorecon1 -noskullstrip -s FS_${sub} -openmp $threads -i ${antDir}/${antPre}ExtractedBrain.nii.gz
+	cp /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FS_${sub}/mri/T1.mgz /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FS_${sub}/mri/brainmask.auto.mgz
+	cp /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FS_${sub}/mri/brainmask.auto.mgz /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FS_${sub}/mri/brainmask.mgz
+	recon-all -autorecon2 -autorecon3 -s FS_${sub} -openmp $threads
 	mkdir -p ${subDir}/FreeSurfer
 	mv /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FS_${sub} ${subDir}/FreeSurfer
 else

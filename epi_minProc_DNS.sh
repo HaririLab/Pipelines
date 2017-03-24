@@ -168,6 +168,7 @@ echo ""
 ###Only calculate for rest1 then apply to rest2 as they are volreged to same base
 if [[ $task != "rest2" ]];then
 	##Use BBR to align EPI to Subject HighRes #citation: ftp://ftp.nmr.mgh.harvard.edu/pub/articles/greve.2009.ni.63.BBR.pdf and https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FLIRT_BBR
+	##Comments: This method works much better in our data for a few reasons: First, a video 1 TR from each subjects aligned and warped EPI reveals much more stable and consisted alignment in BBR than rigid registration, White matter tracts are more clearer and consistently in the same location. Second tSNR maps clearly reveal this shift, old maps are shifted down with substantially worse tSNR in dorsal gray matter. Here tSNR is better in new pipeline on the order of 200%. in ventral areas old is generally better but we've decided this is because WM has higher tSNR and this signal is artifactually being pulled down into ventral GM because of poor alignment. For these reasons we are sticking to BBR and confident in combination of BBR and ants SYN. Without BBR ants SYN with rigid performed globally worse than old pipeline. This is probably because SYN just multiplies noise from poor epi alignment
 	3dcalc -a ${antDir}/${antPre}BrainSegmentation.nii.gz -expr 'equals(a,3)' -prefix ${tmpDir}/ExtractedBrain0N4_wmsegtmp.nii.gz
 	fslreorient2std ${tmpDir}/ExtractedBrain0N4_wmsegtmp.nii.gz ${tmpDir}/ExtractedBrain0N4_FSL_wmseg.nii.gz
 	fslreorient2std ${tmpDir}/epi_dtvbm.nii.gz ${tmpDir}/epi_dtvbmFSL.nii.gz
@@ -197,10 +198,9 @@ voxSize=$(@GetAfniRes ${tmpDir}/epi.nii.gz)
 ##Used WarpTimeSeries instead of AntsApplyTransforms because it worked with 4d time series and I couldn't get applyTransforms to. But when applying each method to the mean image gave perfectly identical results
 ###If task is rest 2 then you want to apply the rigid epi to high rest transform from rest1 so that they are exactly the same
 if [[ $task != "rest2" ]];then
-	antsApplyTransforms -d 3 -e 3 -i ${tmpDir}/epi_dtvbm.nii.gz -o ${tmpDir}/epiWarpedMean.nii.gz -r ${tmpDir}/refTemplate4epi.nii.gz -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -t ${outDir}/epi2highRes0GenericAffine.mat -n BSpline #Bspline seems to retain GM WM contrast the best visually and theoretically seems best
-	antsApplyTransforms -d 3 -e 3 -i ${tmpDir}/epi_dtvb.nii.gz -o ${outDir}/epiWarped.nii.gz -r ${tmpDir}/refTemplate4epi.nii.gz -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -t ${outDir}/epi2highRes0GenericAffine.mat -n BSpline 
-	#antsApplyTransforms -d 3 -e 3 -i ${tmpDir}/epi_dtvbm.nii.gz -o ${tmpDir}/epiWarpedMeanNN.nii.gz -r ${tmpDir}/refTemplate4epi.nii.gz -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -t ${outDir}/epi2highRes0GenericAffine.mat -n NearestNeighbor
-	#antsApplyTransforms -d 3 -e 3 -i ${tmpDir}/epi_dtvb.nii.gz -o ${outDir}/epiWarpedNN.nii.gz -r ${tmpDir}/refTemplate4epi.nii.gz -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -t ${outDir}/epi2highRes0GenericAffine.mat -n NearestNeighbor
+	antsApplyTransforms -d 3 -e 3 -i ${tmpDir}/epi_dtvbm.nii.gz -o ${tmpDir}/epiWarpedMean.nii.gz -r ${tmpDir}/refTemplate4epi.nii.gz -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -t ${outDir}/epi2highRes0GenericAffine.mat -n Linear #At first Bspline looked best but we switched back to Linear because of marked improvements in tSNR maps in linear compared to Bspline compared to oldSPM methods
+	antsApplyTransforms -d 3 -e 3 -i ${tmpDir}/epi_dtvbm.nii.gz -o ${tmpDir}/epiMean2highRes.nii.gz -r ${tmpDir}/refTemplate4epi.nii.gz -t ${outDir}/epi2highRes0GenericAffine.mat -n BSpline
+	antsApplyTransforms -d 3 -e 3 -i ${tmpDir}/epi_dtvb.nii.gz -o ${outDir}/epiWarped.nii.gz -r ${tmpDir}/refTemplate4epi.nii.gz -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -t ${outDir}/epi2highRes0GenericAffine.mat -n Linear 
 	3drefit -space MNI -view tlrc ${outDir}/epiWarped.nii.gz #Refit space of warped epi so that it can be viewed in MNI space within AFNI
 else
 	antsApplyTransforms -d 3 -e 3 -i ${tmpDir}/epi_dtvbm.nii.gz -o ${tmpDir}/epiWarpedMean.nii.gz -r ${tmpDir}/refTemplate4epi.nii.gz -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -t ${subDir}/rest1/epi2highRes0GenericAffine.mat
@@ -209,8 +209,7 @@ else
 fi
 #####Smooth Data 6mm will get output to about 11-13 FWHM on average
 if [[ $task != "rest1" || $task != "rest2" ]];then
-	3dBlurInMask -input ${outDir}/epiWarped.nii.gz -Mmask ${templateDir}/DNS500_first50_BlurMask10_EpiVox.nii.gz -FWHM 6 -prefix ${outDir}/epiWarped_blur6mm.nii.gz
-	3dBlurInMask -input ${outDir}/epiWarped.nii.gz -FWHM 6 -prefix ${outDir}/epiWarped_noMaskBlur6mm.nii.gz
+	3dBlurInMask -input ${outDir}/epiWarped.nii.gz -mask ${templateDir}/${templatePre}BrainExtractionMask_epiVoxDil1.nii.gz -FWHM 6 -prefix ${outDir}/epiWarped_blur6mm.nii.gz ##comments: Decided again a more restricted blur in mask with different compartments for cerebellum etc, because that approach seemed to be slighly harming tSNR actually and did not help with peak voxel or extent analyses when applied to Faces contrast. Decided to use a dilated Brain Extraction mask because this at least gets rid of crap that is way outside of brain. This saves space (slightly) and aids with cleaner visualizations. A GM mask can still later be applied for group analyses, this way we at least leave that up to the user.
 fi
 echo ""
 echo "#########################################################################################################"
@@ -250,7 +249,7 @@ numCenFD50=$(cat ${outDir}/FD.5TRs.1D | wc -l)
 FD25Per=$(echo "${numCenFD25}/${nVols}" | bc -l | cut -c1-5)
 FD50Per=$(echo "${numCenFD50}/${nVols}" | bc -l | cut -c1-5)
 #spatial correlations between epi and highres, epi and Template, and highRes and template as a crude index of alignment quality
-antsApplyTransforms -d 3 -i ${antDir}/${antPre}ExtractedBrain0N4.nii.gz -o ${tmpDir}/BrainNormalizedToTemplate.nii.gz -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -r ${antDir}/${antPre}ExtractedBrain0N4.nii.gz -n BSpline
+antsApplyTransforms -d 3 -i ${antDir}/${antPre}ExtractedBrain0N4.nii.gz -o ${tmpDir}/BrainNormalizedToTemplate.nii.gz -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -r ${antDir}/${antPre}ExtractedBrain0N4.nii.gz -n Linear
 epi2TemplateCor=$(3ddot -mask ${tmpDir}/refTemplateBrainMask.nii.gz ${tmpDir}/refTemplate4epi.nii.gz ${tmpDir}/epiWarpedMean.nii.gz | sed "s/ *//g" | sed "s/\t\t*//g" )
 epi2highResCor=$(3ddot -mask ${antDir}/${antPre}BrainExtractionMask.nii.gz ${antDir}/${antPre}ExtractedBrain0N4.nii.gz ${tmpDir}/epi2highResBBR.nii.gz | sed "s/ *//g"| sed "s/\t\t*//g")
 highRes2TemplateCor=$(3ddot -mask ${templateDir}/${templatePre}BrainExtractionMask.nii.gz  ${tmpDir}/BrainNormalizedToTemplate.nii.gz ${templateDir}/${templatePre}Brain.nii.gz | sed "s/ *//g" | sed "s/\t\t*//g")
@@ -259,9 +258,7 @@ echo "tSNR,rawFWHM,warpedFWHM,FDavg,FDsd,DVARSavg,DVARSsd,FD25Per,FD50Per,epi2Te
 echo "$tSNR,$rawFWHM,$warpedFWHM,$FDavg,$FDsd,$DVARSavg,$DVARSsd,$FD25Per,$FD50Per,$epi2TemplateCor,$epi2highResCor,$highRes2TemplateCor" >> ${QADir}/${task}.QCmeasures.txt
 ######Make Edges and montage of warped edges overlain target Struct to check alignment
 ##epi Alignment to HighRes
-3dedge3 -input ${tmpDir}/epi2highResBBR.nii.gz -prefix ${tmpDir}/epi2highResWarpedEdgestmp.nii.gz  #Detect edges
-3dmask_tool -input ${antDir}/${antPre}BrainExtractionMask.nii.gz -prefix ${tmpDir}/BrainExtractionMaskDial2.nii.gz -dilate_inputs 2 ###Used to make weird lines in edge detection that are noise from interpolation, I think this is specific to FSL intepolation so eventually might want to apply warps with ANTS instead for this step
-3dcalc -a ${tmpDir}/epi2highResWarpedEdgestmp.nii.gz -b ${tmpDir}/BrainExtractionMaskDial2.nii.gz -expr 'a*b' -prefix ${tmpDir}/epi2highResWarpedEdges.nii.gz
+3dedge3 -input ${tmpDir}/epiMean2highRes.nii.gz -prefix ${tmpDir}/epi2highResWarpedEdges.nii.gz  #Detect edges
 ConvertScalarImageToRGB 3 ${tmpDir}/epi2highResWarpedEdges.nii.gz ${tmpDir}/epi2highResEdgesRBG.nii.gz none red none 0 10 #convert for Ants Montage
 3dcalc -a ${tmpDir}/epi2highResEdgesRBG.nii.gz -expr 'step(a)' -prefix ${tmpDir}/epi2highResEdgesRBGstep.nii.gz #Make mask to make Edges stand out
 CreateTiledMosaic -i ${antDir}/${antPre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/epi2highResEdgesRBG.nii.gz -o ${QADir}/${task}.epi2HighResAlignmentCheck.png -a 0.8 -t -1x-1 -d 2 -p mask -s [5,mask,mask] -x ${tmpDir}/epi2highResEdgesRBGstep.nii.gz -f 0x1  #Create Montage taking images in axial slices every 5 slices
@@ -276,7 +273,7 @@ ConvertScalarImageToRGB 3 ${tmpDir}/highRes2TemplateWarpedEdges.nii.gz ${tmpDir}
 3dcalc -a ${tmpDir}/highRes2TemplateEdgesRBG.nii.gz -expr 'step(a)' -prefix ${tmpDir}/highRes2TemplateEdgesRBGstep.nii.gz #Make mask to make Edges stand out
 CreateTiledMosaic -i ${templateDir}/${templatePre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/highRes2TemplateEdgesRBG.nii.gz -o ${QADir}/${task}.highRes2TemplateAlignmentCheck.png -a 0.8 -t -1x-1 -d 2 -p mask -s [5,mask,mask] -x ${tmpDir}/highRes2TemplateEdgesRBGstep.nii.gz -f 0x1  #Create Montage taking images in axial slices every 5 slices
 ##epiWarpedMean to Template
-antsApplyTransforms -d 3 -e 3 -i ${tmpDir}/epi_dtvbm.nii.gz -o ${tmpDir}/epiWarpedMeanHR.nii.gz -r ${templateDir}/${templatePre}BrainSegmentation0N4.nii.gz  -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -t ${outDir}/epi2highRes0GenericAffine.mat -n BSpline
+antsApplyTransforms -d 3 -e 3 -i ${tmpDir}/epi_dtvbm.nii.gz -o ${tmpDir}/epiWarpedMeanHR.nii.gz -r ${templateDir}/${templatePre}BrainSegmentation0N4.nii.gz  -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -t ${outDir}/epi2highRes0GenericAffine.mat -n Linear
 3dedge3 -input ${tmpDir}/epiWarpedMeanHR.nii.gz -prefix ${tmpDir}/epi2TemplateWarpedEdges.nii.gz  #Detect edges
 ConvertScalarImageToRGB 3 ${tmpDir}/epi2TemplateWarpedEdges.nii.gz ${tmpDir}/epi2TemplateEdgesRBG.nii.gz none red none 0 10 #convert for Ants Montage
 3dcalc -a ${tmpDir}/epi2TemplateEdgesRBG.nii.gz -expr 'step(a)' -prefix ${tmpDir}/epi2TemplateEdgesRBGstep.nii.gz #Make mask to make Edges stand out
@@ -288,7 +285,7 @@ ConvertScalarImageToRGB 3 ${tmpDir}/epiMeanEdges.nii.gz ${tmpDir}/epiMeanEdgesRB
 CreateTiledMosaic -i ${tmpDir}/epi_dtvbm.nii.gz -r ${tmpDir}/epiMeanEdgesRBG.nii.gz -o ${QADir}/${task}.epiMeanEdgesAlignmentCheck.png -a 0.8 -t -1x-1 -d 2 -p mask -s [1,mask,mask] -x ${tmpDir}/epiMeanEdgesRBGstep.nii.gz -f 0x0  #Create Montage taking images in axial slices every 5 slices
 
 ##Clean up
-#rm -r $tmpDir
+rm -r $tmpDir
 
 
 ##########Citations
