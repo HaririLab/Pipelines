@@ -96,13 +96,13 @@ clist=$(cat ${outDir}/censorTRs.1D)
 lenC=$(echo $clist | wc -w )
 ##pipeNotes: consider Changing GM mask to one based on all subjects eventually, the all Caucasian with 570 subs should be fine
 if [[ $lenC == 0 ]];then
-	3dTproject -input ${outDir}/rest*/epiWarped.nii.gz -mask ${templateDir}/${templatePre}BrainExtractionMask_epiVoxDil1.nii.gz -prefix ${tmpDir}/epiPrepped.nii.gz -ort ${outDir}/allmotion.1D -ort ${outDir}/allmotion_deriv.1D -ort ${outDir}/allCompCorr.1D -polort 1 -bandpass 0.008 0.10 
+	3dTproject -input ${outDir}/rest*/epiWarped.nii.gz -mask ${templateDir}/${templatePre}BrainExtractionMask_epiVoxDil1.nii.gz -prefix ${outDir}/epiPrepped.nii.gz -ort ${outDir}/allmotion.1D -ort ${outDir}/allmotion_deriv.1D -ort ${outDir}/allCompCorr.1D -polort 1 -bandpass 0.008 0.10 
 ##comments: Decided again a more restricted blur in mask with different compartments for cerebellum etc, because that approach seemed to be slighly harming tSNR actually and did not help with peak voxel or extent analyses when applied to Faces contrast. Decided to use a dilated Brain Extraction mask because this at least gets rid of crap that is way outside of brain. This saves space (slightly) and aids with cleaner visualizations. A GM mask can still later be applied for group analyses, this way we at least leave that up to the user.
 else
-	3dTproject -input ${outDir}/rest*/epiWarped.nii.gz -mask ${templateDir}/${templatePre}BrainExtractionMask_epiVoxDil1.nii.gz -prefix ${tmpDir}/epiPrepped.nii.gz -CENSORTR $clist -ort ${outDir}/allmotion.1D -ort ${outDir}/allmotion_deriv.1D -ort ${outDir}/allCompCorr.1D -polort 1 -bandpass 0.008 0.10 
+	3dTproject -input ${outDir}/rest*/epiWarped.nii.gz -mask ${templateDir}/${templatePre}BrainExtractionMask_epiVoxDil1.nii.gz -prefix ${outDir}/epiPrepped.nii.gz -CENSORTR $clist -ort ${outDir}/allmotion.1D -ort ${outDir}/allmotion_deriv.1D -ort ${outDir}/allCompCorr.1D -polort 1 -bandpass 0.008 0.10 
 ##comments: Decided again a more restricted blur in mask with different compartments for cerebellum etc, because that approach seemed to be slighly harming tSNR actually and did not help with peak voxel or extent analyses when applied to Faces contrast. Decided to use a dilated Brain Extraction mask because this at least gets rid of crap that is way outside of brain. This saves space (slightly) and aids with cleaner visualizations. A GM mask can still later be applied for group analyses, this way we at least leave that up to the user.
 fi
 
-
+rm -r $tmpDir
 #pipenotes: Cen options in 3dTproject start at 0, currently ours based on awk start with 1. Make sure to subtract 1 before giving to tproject!!!!
 
