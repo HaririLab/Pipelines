@@ -29,8 +29,8 @@ antDir=${subDir}/antCT
 freeDir=${subDir}/FreeSurfer
 tmpDir=${antDir}/tmp
 antPre="highRes_" #pipenotes= Change away from HardCoding later
-templateDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/templates/mni_icbm152_antCT #Assume MNI icbm152 as a general template ##WARNING make sure you want this
-templatePre=mni_icbm152_antCT #pipenotes= update/Change away from HardCoding later
+templateDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/templates/DNS500 #pipenotes= update/Change away from HardCoding later
+templatePre=DNS500template_MNI #pipenotes= update/Change away from HardCoding later
 T1=$3 #where is the raw T1 file
 threads=1 #default in case thread argument is not passed
 threads=$4
@@ -57,7 +57,7 @@ if [[ ! -f ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate.nii.gz ]];th
 	echo "#########################################################################################################"
 	echo ""
 	###Run antCT
-	antsCorticalThickness.sh -d 3 -a ${antDir}/${antPre}rWarped.nii.gz -e ${templateDir}/${templatePre}.nii.gz -m ${templateDir}/${templatePre}BrainCerebellumProbabilityMask.nii.gz -p ${templateDir}/${templatePre}BrainSegmentationPosteriors%d.nii.gz -t ${templateDir}/${templatePre}Brain.nii.gz -o ${antDir}/${antPre}
+	antsCorticalThickness.sh -d 3 -a ${antDir}/${antPre}rWarped.nii.gz -e ${templateDir}/${templatePre}.nii.gz -m ${templateDir}/${templatePre}_BrainCerebellumProbabilityMask.nii.gz -p ${templateDir}/${templatePre}_BrainSegmentationPosteriors%d.nii.gz -t ${templateDir}/${templatePre}_Brain.nii.gz -o ${antDir}/${antPre}
 else
 	echo ""
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Skipping antCT, Completed Previously!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"

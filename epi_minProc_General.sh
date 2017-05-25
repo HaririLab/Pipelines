@@ -81,8 +81,10 @@ echo ""
 
 epi=$(ls $epiWC | sed "${epiRun}q;d")
 epiNum=$(ls $epiWC | wc -l)
+####Remove first 5 TRs to allow fMRI to get to steady state
+3dcalc -a ${epi}'[5..$]' -expr a -prefix ${tmpDir}/epi_cut.nii.gz
 ###Resample structural to voxel dimensions of epi for grid when applying warps
-3dDespike -prefix ${tmpDir}/epi_d.nii.gz $epi #citation:Jo et al., 2014 #pipeNotes: do we want to do this on tasks?? #citation: Kalcher et al., 2013. Example of despiking in task analysis...at least some people do this... #citation: also https://afni.nimh.nih.gov/afni/community/board/read.php?1,141185,143682#msg-143682, small comment "helpful, more important in rest than task" 
+3dDespike -prefix ${tmpDir}/epi_d.nii.gz -NEW ${tmpDir}/epi_cut.nii.gz #citation:Jo et al., 2014 #pipeNotes: do we want to do this on tasks?? #citation: Kalcher et al., 2013. Example of despiking in task analysis...at least some people do this... #citation: also https://afni.nimh.nih.gov/afni/community/board/read.php?1,141185,143682#msg-143682, small comment "helpful, more important in rest than task" 
 3dTshift -tpattern seqplus -tzero 0 -prefix ${tmpDir}/epi_dt.nii.gz ${tmpDir}/epi_d.nii.gz #perform t-shifting
 
 3dvolreg -base 0 -zpad 1  -prefix ${tmpDir}/epi_dtv.nii.gz -1Dfile ${outDir}/motion.1D ${tmpDir}/epi_dt.nii.gz # volume registation and extraction of motion trace

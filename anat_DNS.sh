@@ -9,9 +9,6 @@
 ###########!!!!!!!!!Pipeline to do!!!!!!!!!!!!!#############
 #1)make citations #citations
 #2)Follow up on #pipeNotes using ctrl f pipeNotes.... Made these when I knew a trick or something I needed to do later
-#3) 3drefit all files in MNI space with -space MNI -view tlrc
-#4) maybe add a cut of brain stem, seems to be some issues with this and could add robustness
-#5) add optimization to template Brain Mask, 3dzcut then inflate to help with slight cutting of top gyri
 
 ###########!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!###########################
 
@@ -38,12 +35,14 @@ export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$threads
 export OMP_NUM_THREADS=$threads
 
 T1pre=$(grep $sub /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/All_Imaging/DataLocations.csv | cut -d "," -f3 | sed 's/ //g')
-if [[ $T1pre == "not_collected" ]];then
+if [[ $T1pre == "not_collected" || $T1pre == "dont_use" ]];then
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-	echo "!!!!!!!!!!!!!!!!!!!!!NO T1, skipping Anat Processing and Epi processing will also be unavailable!!!!!!!!!!!!!!!"
-	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!EXITING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!NO T1, Trying to Run on Coplanar so that EPIs might be salvaged!!!!!!!!!!!!!!!!!!!!!!"
+	echo "!!!!!!!!!!!!!!!!!!!!!!!!Make sure you know what you are doing if you use this sub in any analysis!!!!!!!!!!!!!!"
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-	exit
+	T1pre=$(grep $sub /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/All_Imaging/DataLocations.csv | cut -d "," -f2 | sed 's/ //g')
+	echo "Make sure you know what you are doing if you use this sub in any analysis" > ${antDir}/000000.COPLANARnotT1.00000000
+	echo "Make sure you know what you are doing if you use this sub in any analysis" > ${freeDir}/000000.COPLANARnotT1.00000000
 fi
 
 ##Set up directory
@@ -51,7 +50,8 @@ mkdir -p $QADir
 cd $subDir
 mkdir -p $antDir
 mkdir -p $tmpDir
-SUBJECTS_DIR=${subDir} #pipenotes= update/Change away from HardCoding later also figure out FS_AVG stuff
+export SUBJECTS_DIR=${subDir} #pipenotes= update/Change away from HardCoding later also figure out FS_AVG stuff
+export FREESURFER_HOME=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/freesurfer
 
 if [[ ! -f ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate.nii.gz ]];then
 
@@ -67,9 +67,11 @@ if [[ ! -f ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate.nii.gz ]];th
 		else
 			echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 			echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!T1 is the Wrong Size, wrong number of slices!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-			echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!EXITING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+			echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Make Sure you Know what you are doing!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 			echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-			exit
+			to3d -anat -prefix tmpT1.nii.gz /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/${T1pre}/*.dcm
+			mv tmpT1.nii.gz ${tmpDir}/
+			T1=${tmpDir}/tmpT1.nii.gz
 		fi
 	fi
 
@@ -122,6 +124,7 @@ if [[ ! -f ${freeDir}/SUMA/std.60.rh.pial.asc ]];then
 	cp ${freeDir}/mri/T1.mgz ${freeDir}/mri/brainmask.auto.mgz
 	cp ${freeDir}/mri/brainmask.auto.mgz ${freeDir}/mri/brainmask.mgz
 	recon-all -autorecon2 -autorecon3 -s FreeSurfer -openmp $threads
+	recon-all -s FreeSurfer -localGI
 else
 	echo ""
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!Skipping FreeSurfer, Completed Previously!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -135,7 +138,7 @@ if [[ ! -f ${freeDir}/SUMA/std.60.rh.pial.asc ]];then
 	echo "#########################################################################################################"
 	echo ""
 	cd ${freeDir}
-	@SUMA_Make_Spec_FS -ld 60 -sid FreeSurfer
+	@SUMA_Make_Spec_FS_lgi -NIFTI -ld 60 -sid FreeSurfer
 else
 	echo ""
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!Skipping SUMA_Make_Spec, Completed Previously!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -144,7 +147,7 @@ fi
 
 #cleanup
 #mv highRes_* antCT/ #pipeNotes: add more deletion and clean up to minimize space, think about deleting Freesurfer and some of SUMA output
-rm -r ${antDir}/tmp ${freeDir}/bem ${freeDir}/label ${freeDir}/morph ${freeDir}/mpg ${freeDir}/mri ${freeDir}/rgb ${freeDir}/src ${freeDir}/surf ${freeDir}/tiff ${freeDir}/tmp ${freeDir}/touch ${freeDir}/trash
+rm -r ${antDir}/tmp ${freeDir}/bem ${freeDir}/label ${freeDir}/morph ${freeDir}/mpg ${freeDir}/mri ${freeDir}/rgb ${freeDir}/src ${freeDir}/surf ${freeDir}/tiff ${freeDir}/tmp ${freeDir}/touch ${freeDir}/trash ${freeDir}/SUMA/lh.* ${freeDir}/SUMA/rh.* ${freeDir}/SUMA/FreeSurfer_.*spec
 rm ${antDir}/${antPre}BrainNormalizedToTemplate.nii.gz ${antDir}/${antPre}TemplateToSubject*
 gzip ${freeDir}/SUMA/*.nii 
  

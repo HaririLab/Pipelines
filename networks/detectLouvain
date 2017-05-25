@@ -1,0 +1,90 @@
+#!/bin/bash
+#
+# Script: detectLouvian
+# Purpose: Wrapper around a handful of utilities to make graphs and detect multi-slice communities Bassett Style
+# Author: Maxwell Elliott
+# Date: 5/25/17
+
+
+###############################################################################
+#
+# Environment set up
+#
+###############################################################################
+
+nargs=$#
+if [[ $nargs -lt 4 ]];then
+	echo "
+	########Requirements###########
+	1)Matlab, with 
+	######Call structure############
+
+	detectLouvain -i {preprocessed volume} -r {roiMask} -s {subject ID} -p {prefix} 
+	
+	Example) run_preprocess_Uber.bash -i /munin/DNS.01/Analysis/All_Imaging/DNS0568/rest/epiPrepped.nii.gz -r /munin/DNS.01/Analysis/Max/templates/DNS500/lausanne/scale500/LausanneScale500_DNS500Blur10_2mmWCer.nii.gz -p lausanne500
+	##############Intro################
+	Wrapper around a handful of utilities to make graphs and detect multi-slice communities Bassett Style
+
+	#INPUTS: 
+		-i infile, Nifti file of preprocessed time series data to be 'community detected'
+		-r ROIs, nifti with ROIs defined in the same voxel space as infile. Mean time series will be calculated within each ROI
+		-s subject ID, this will be used to organize file into the correct All_Imaging directory and check to see if it is already made
+		-p prefix to be appeded to each output file
+	#OUTPUTS:
+
+	####################################
+	"
+else
+	###Set up argument defaults
+	  while getopts "i:r:s:p:" OPT;do
+	      case $OPT in
+		  i) #infile
+	       		epi=$OPTARG
+			echo "epi=$epi"
+	       		;;
+		  r) #rois
+	       		rois=$OPTARG
+			echo "CompCorr=$CompCorr"
+			fi
+	       		;;
+		  r) #subID
+	       		subID=$OPTARG
+			echo "subID=$subID"
+	       		;;
+		  s) #prefix
+	       		prefix=$OPTARG
+			echo "prefix=$prefix"
+		  *) # getopts issues an error message
+	       		echo "ERROR:  unrecognized option -$OPT $OPTARG"
+	       		exit
+	       		;;
+	      esac
+	  done
+fi
+
+
+
+###############################################################################
+#
+# Main 
+#
+###############################################################################
+
+###Check if this epi roi combination has already been run
+
+##Extract ROI avg time series
+
+roi2ts.R -i $epi -r $rois >
+
+###Do wavelet/spectral correlation
+
+##Detect FDR significant associations and set all non-significant to 0
+
+## Run mulit-slice community detection many times ussing genLouvain or iterated_genLouvain in MATLAB
+
+## I think you should then run Bassett's consensus_iterative script to find the best partition
+
+##Calculate metrics based on the matrix of community assignments
+
+
+
