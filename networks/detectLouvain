@@ -44,7 +44,7 @@ else
 	       		;;
 		  r) #rois
 	       		rois=$OPTARG
-			echo "CompCorr=$CompCorr"
+			echo "rois=$rois"
 			fi
 	       		;;
 		  r) #subID
