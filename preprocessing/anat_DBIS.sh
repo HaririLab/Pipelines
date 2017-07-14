@@ -25,9 +25,9 @@ sub=$1 #$1 or flag -s  #20161103_21449 #pipenotes= Change away from HardCoding l
 subDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/${sub} #pipenotes= Change away from HardCoding later
 QADir=${subDir}/QA
 antDir=${subDir}/antCT
-freeDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FS_${sub}
+freeDir=${subDir}/FreeSurfer
 tmpDir=${antDir}/tmp
-antPre="highRes_" #pipenotes= Change away from HardCoding later
+antPre="highRes_" #pipenotes= Change away from HardCoding laterF
 templateDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/Max/templates/DBIS115 #pipenotes= update/Change away from HardCoding later
 templatePre=dunedin115template_MNI #pipenotes= update/Change away from HardCoding later
 #T1=$2 #/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Data/Anat/20161103_21449/bia5_21449_006.nii.gz #pipenotes= update/Change away from HardCoding later
@@ -36,9 +36,26 @@ threads=$2
 export PATH=$PATH:/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/Pipelines/scripts/ #add dependent scripts to path #pipenotes= update/Change to DNS scripts
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=$threads
 export OMP_NUM_THREADS=$threads
+export SUBJECTS_DIR=${subDir}
+export FREESURFER_HOME=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/freesurfer
+export PATH=$PATH:/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/Pipelines/scripts/:/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/Pipelines/utils/
+##Set up directory
+mkdir -p $QADir
+cd $subDir
+mkdir -p $antDir
+mkdir -p $tmpDir
 
-T1=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/SPM/Processed/${sub}/anat/HighRes.nii
-FLAIR=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/SPM/Processed/${sub}/anat/3DFLAIR.nii
+anatDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_t1_0.9_mprage_sag_iso_p2/
+flairDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/DMHDS0235/DMHDS/MR_3D_SAG_FLAIR_FS-_1.2_mm/
+Dimon -infile_prefix ${anatDir}/1.3.12.2.1107.5.2.19 -dicom_org -gert_create_dataset -use_obl_origin
+Dimon -gert_to3d_prefix flair.nii.gz -infile_prefix ${flairDir}/1.3.12.2.1107.5.2.19 -dicom_org -gert_create_dataset -use_obl_origin
+bestT1=$(ls OutBrick_run_0* | tail -n1)
+3dcopy ${bestT1} ${tmpDir}/anat.nii.gz
+mv flair.nii.gz dimon* GERT* ${tmpDir}
+mv OutBrick* ${tmpDir}
+
+T1=${tmpDir}/anat.nii.gz
+FLAIR=${tmpDir}/flair.nii.gz
 if [[ ! -f $T1 ]];then
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 	echo "!!!!!!!!!!!!!!!!!!!!!NO T1, skipping Anat Processing and Epi processing will also be unavailable!!!!!!!!!!!!!!!"
@@ -47,11 +64,7 @@ if [[ ! -f $T1 ]];then
 	exit
 fi
 
-##Set up directory
-mkdir -p $QADir
-cd $subDir
-mkdir -p $antDir
-mkdir -p $tmpDir
+
 
 if [[ ! -f ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate.nii.gz ]];then
 	sizeT1=$(@GetAfniRes ${T1})
@@ -77,6 +90,21 @@ else
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Skipping antCT, Completed Previously!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 	echo ""
 fi
+##Smooth Cortical Thickness for 2nd level
+if [[ ! -f ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate_blur8mm.nii.gz ]];then
+	3dBlurInMask -input ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate.nii.gz -mask ${templateDir}/${templatePre}AvgGMSegWarped25connected.nii.gz -FWHM 8 -prefix ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate_blur8mm.nii.gz
+fi
+###Make VBM and smooth
+if [[ ! -f ${antDir}/${antPre}JacModVBM_blur8mm.nii.gz ]];then
+	antsApplyTransforms -d 3 -r ${templateDir}/${templatePre}.nii.gz -i ${antDir}/${antPre}BrainSegmentationPosteriors2.nii.gz -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -o ${antDir}/${antPre}GMwarped.nii.gz
+	antsApplyTransforms -d 3 -r ${templateDir}/${templatePre}.nii.gz -i ${antDir}/${antPre}BrainSegmentationPosteriors4.nii.gz -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -o ${antDir}/${antPre}SCwarped.nii.gz
+	antsApplyTransforms -d 3 -r ${templateDir}/${templatePre}.nii.gz -i ${antDir}/${antPre}BrainSegmentationPosteriors5.nii.gz -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -o ${antDir}/${antPre}BSwarped.nii.gz
+	antsApplyTransforms -d 3 -r ${templateDir}/${templatePre}.nii.gz -i ${antDir}/${antPre}BrainSegmentationPosteriors6.nii.gz -t ${antDir}/${antPre}SubjectToTemplate1Warp.nii.gz -t ${antDir}/${antPre}SubjectToTemplate0GenericAffine.mat -o ${antDir}/${antPre}CBwarped.nii.gz
+	3dcalc -a ${antDir}/${antPre}GMwarped.nii.gz -b ${antDir}/${antPre}SCwarped.nii.gz -c ${antDir}/${antPre}CBwarped.nii.gz -d ${antDir}/${antPre}BSwarped.nii.gz -e ${templateDir}/${templatePre}_blurMask25.nii.gz -i ${antDir}/${antPre}SubjectToTemplateLogJacobian.nii.gz -expr '(a*equals(e,1)+b*equals(e,2)+c*equals(e,3)+d*equals(e,4))*i' -prefix ${antDir}/${antPre}JacModVBM.nii.gz
+	3dcalc -a ${antDir}/${antPre}GMwarped.nii.gz -b ${antDir}/${antPre}SCwarped.nii.gz -c ${antDir}/${antPre}CBwarped.nii.gz -d ${antDir}/${antPre}BSwarped.nii.gz -e ${templateDir}/${templatePre}_blurMask25.nii.gz -expr '(a*equals(e,1)+b*equals(e,2)+c*equals(e,3)+d*equals(e,4))' -prefix ${antDir}/${antPre}noModVBM.nii.gz
+	3dBlurInMask -input ${antDir}/${antPre}JacModVBM.nii.gz -Mmask ${templateDir}/${templatePre}_blurMask25.nii.gz -FWHM 8 -prefix ${antDir}/${antPre}JacModVBM_blur8mm.nii.gz
+	3dBlurInMask -input ${antDir}/${antPre}noModVBM.nii.gz -Mmask ${templateDir}/${templatePre}_blurMask25.nii.gz -FWHM 8 -prefix ${antDir}/${antPre}noModVBM_blur8mm.nii.gz
+fi
 ###Make Brain Extraction QA montages
 if [[ ! -f ${QADir}/anat.BrainExtractionCheckAxial.png ]];then
 	echo ""
@@ -93,7 +121,7 @@ if [[ ! -f ${QADir}/anat.BrainExtractionCheckAxial.png ]];then
 	CreateTiledMosaic -i ${antDir}/${antPre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/highRes_BrainRBG.nii.gz -o ${QADir}/anat.BrainExtractionCheckAxial.png -a 0.5 -t -1x-1 -d 2 -p mask -s [5,mask,mask] -x ${tmpDir}/highRes_BrainRBGstep.nii.gz -f 0x1
 	CreateTiledMosaic -i ${antDir}/${antPre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/highRes_BrainRBG.nii.gz -o ${QADir}/anat.BrainExtractionCheckSag.png -a 0.5 -t -1x-1 -d 0 -p mask -s [5,mask,mask] -x ${tmpDir}/highRes_BrainRBGstep.nii.gz -f 0x1
 fi
-if [[ ! -f ${freeDir}/surf/rh.pial ]];then
+if [[ ! -f ${freeDir}/SUMA/std.60.rh.thickness.niml.dset ]];then
 	###Prep for Freesurfer with PreSkull Stripped
 	#Citation: followed directions from https://surfer.nmr.mgh.harvard.edu/fswiki/UserContributions/FAQ (search skull)
 	echo ""
@@ -101,54 +129,54 @@ if [[ ! -f ${freeDir}/surf/rh.pial ]];then
 	echo "#####################################FreeSurfer Surface Generation#######################################"
 	echo "#########################################################################################################"
 	echo ""
-	export SUBJECTS_DIR=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/
-	3dcalc -a ${antDir}/${antPre}rWarped.nii.gz -b ${antDir}/${antPre}BrainExtractionMask.nii.gz -expr 'a*b' -prefix ${antDir}/${antPre}ExtractedBrain.nii.gz
 	###Pipenotes: Currently not doing highRes processing. Can't get it to run without crashing. Also doesn't add that much to our voxels that are already near 1mm^3
 	##Set up options file to allow for sub mm voxel high res run of FreeSurfer
 	#echo "mris_inflate -n 15" > ${tmpDir}/expert.opts
-	#Run 
-	cd /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/
-	recon-all -autorecon1 -noskullstrip -s FS_${sub} -openmp $threads -i ${antDir}/${antPre}ExtractedBrain.nii.gz
-	cp /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FS_${sub}/mri/T1.mgz /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FS_${sub}/mri/brainmask.auto.mgz
-	cp /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FS_${sub}/mri/brainmask.auto.mgz /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FS_${sub}/mri/brainmask.mgz
-	recon-all -autorecon2 -autorecon3 -s FS_${sub} -openmp $threads
-	mkdir -p ${subDir}/FreeSurfer
-	mv /mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/All_Imaging/FS_${sub} ${subDir}/FreeSurfer
+	#Run
+	rm -r ${freeDir}
+	mksubjdirs FreeSurfer
+	cp -R ${FREESURFER_HOME}/subjects/fsaverage ${subDir}/
+	mri_convert ${antDir}/${antPre}ExtractedBrain0N4.nii.gz ${freeDir}/mri/001.mgz
+	recon-all -autorecon1 -noskullstrip -s FreeSurfer -openmp $threads
+	cp ${freeDir}/mri/T1.mgz ${freeDir}/mri/brainmask.auto.mgz
+	cp ${freeDir}/mri/brainmask.auto.mgz ${freeDir}/mri/brainmask.mgz
+	recon-all -autorecon2 -autorecon3 -s FreeSurfer -openmp $threads
+	recon-all -s FreeSurfer -localGI
+	if [[ -f $FLAIR ]];then
+		if [[ ! -f ${freeDir}/surf/lh.woFLAIR.pial ]];then
+			echo ""
+			echo "#########################################################################################################"
+			echo "#####################################Cleanup of Surface With FLAIR#######################################"
+			echo "#########################################################################################################"
+			echo ""
+			recon-all -subject FreeSurfer -FLAIRpial -FLAIR $FLAIR -FLAIRpial -autorecon3 -openmp $threads #citation: https://surfer.nmr.mgh.harvard.edu/fswiki/recon-all#UsingT2orFLAIRdatatoimprovepialsurfaces
+			rm -r ${freeDir}/SUMA ##Removed because SUMA surface will be based on wrong pial if above ran
+		fi
+	fi
 else
 	echo ""
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!Skipping FreeSurfer, Completed Previously!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 	echo ""
 fi
 
-if [[ -f $FLAIR ]];then
-	if [[ ! -f ${freeDir}/surf/lh.woFLAIR.pial ]];then
-		echo ""
-		echo "#########################################################################################################"
-		echo "#####################################Cleanup of Surface With FLAIR#######################################"
-		echo "#########################################################################################################"
-		echo ""
-		recon-all -subject FreeSurfer -FLAIRpial -FLAIR $FLAIR -FLAIRpial -autorecon3 -openmp $threads #citation: https://surfer.nmr.mgh.harvard.edu/fswiki/recon-all#UsingT2orFLAIRdatatoimprovepialsurfaces
-		rm -r ${freeDir}/SUMA ##Removed because SUMA surface will be based on wrong pial if above ran
-	fi
-fi
 #Run SUMA
-if [[ ! -f ${freeDir}/SUMA/std.60.rh.pial.asc ]];then
+if [[ ! -f ${freeDir}/SUMA/std.60.rh.thickness.niml.dset ]];then
 	echo ""
 	echo "#########################################################################################################"
 	echo "######################################Map Surfaces to SUMA and AFNI######################################"
 	echo "#########################################################################################################"
 	echo ""
 	cd ${freeDir}
-	@SUMA_Make_Spec_FS -ld 60 -sid FreeSurfer
+	@SUMA_Make_Spec_FS_lgi -NIFTI -ld 60 -sid FreeSurfer
 else
 	echo ""
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!Skipping SUMA_Make_Spec, Completed Previously!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 	echo ""
 fi
-
 #cleanup
 #mv highRes_* antCT/ #pipeNotes: add more deletion and clean up to minimize space, think about deleting Freesurfer and some of SUMA output
-#rm -r ${antDir}/tmp ${freeDir}/bem ${freeDir}/label ${freeDir}/morph ${freeDir}/mpg ${freeDir}/mri ${freeDir}/rgb ${freeDir}/src ${freeDir}/surf ${freeDir}/tiff ${freeDir}/tmp ${freeDir}/touch ${freeDir}/trash
-rm ${antDir}/${antPre}BrainNormalizedToTemplate.nii.gz ${antDir}/${antPre}TemplateToSubject* ${subDir}/dimon.files* ${subDir}/GERT_Reco*
+#rm -r ${antDir}/tmp ${freeDir}/bem ${freeDir}/label ${freeDir}/morph ${freeDir}/mpg ${freeDir}/mri ${freeDir}/rgb ${freeDir}/src ${freeDir}/surf ${freeDir}/tiff ${freeDir}/tmp ${freeDir}/touch ${freeDir}/trash ${subDir}/fsaverage
+rm -r ${antDir}/${antPre}BrainNormalizedToTemplate.nii.gz ${antDir}/${antPre}TemplateToSubject* ${subDir}/dimon.files* ${subDir}/GERT_Reco* ${antDir}/tmp
+rm -r ${antDir}/tmp ${freeDir}/SUMA/FreeSurfer_.*spec  ${freeDir}/SUMA/lh.* ${freeDir}/SUMA/rh.* ${subDir}/fsaverage #${freeDir}/bem ${freeDir}/label ${freeDir}/morph ${freeDir}/mpg ${freeDir}/mri ${freeDir}/rgb ${freeDir}/src ${freeDir}/surf ${freeDir}/tiff ${freeDir}/tmp ${freeDir}/touch ${freeDir}/trash
 gzip ${freeDir}/SUMA/*.nii 
  

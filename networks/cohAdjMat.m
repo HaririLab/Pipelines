@@ -7,7 +7,7 @@ which modwt
 wav2decom = zeros(a,b);
 for i=1:b
     wavDec=modwt(fmDat(:,i),'LA8','conservative','circular');
-    wav2decom(:,i)=wavDec(:,2); % wavelet 2 for node i
+    wav2decom(:,i)=wavDec(2,:); % wavelet 2 for node i
 end
 %create coherence adjacency matrix
 cap=a-14;%upper limit of lower window edge, change if you want a shorter or longer sliding window
