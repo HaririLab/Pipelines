@@ -121,7 +121,7 @@ if [[ ! -f ${QADir}/anat.BrainExtractionCheckAxial.png ]];then
 	CreateTiledMosaic -i ${antDir}/${antPre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/highRes_BrainRBG.nii.gz -o ${QADir}/anat.BrainExtractionCheckAxial.png -a 0.5 -t -1x-1 -d 2 -p mask -s [5,mask,mask] -x ${tmpDir}/highRes_BrainRBGstep.nii.gz -f 0x1
 	CreateTiledMosaic -i ${antDir}/${antPre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/highRes_BrainRBG.nii.gz -o ${QADir}/anat.BrainExtractionCheckSag.png -a 0.5 -t -1x-1 -d 0 -p mask -s [5,mask,mask] -x ${tmpDir}/highRes_BrainRBGstep.nii.gz -f 0x1
 fi
-if [[ ! -f ${freeDir}/SUMA/std.60.rh.thickness.niml.dset ]];then
+if [[ ! -f ${freeDir}/surf/rh.pial ]];then
 	###Prep for Freesurfer with PreSkull Stripped
 	#Citation: followed directions from https://surfer.nmr.mgh.harvard.edu/fswiki/UserContributions/FAQ (search skull)
 	echo ""
@@ -137,22 +137,23 @@ if [[ ! -f ${freeDir}/SUMA/std.60.rh.thickness.niml.dset ]];then
 	mksubjdirs FreeSurfer
 	cp -R ${FREESURFER_HOME}/subjects/fsaverage ${subDir}/
 	mri_convert ${antDir}/${antPre}ExtractedBrain0N4.nii.gz ${freeDir}/mri/001.mgz
+	#Run 
 	recon-all -autorecon1 -noskullstrip -s FreeSurfer -openmp $threads
 	cp ${freeDir}/mri/T1.mgz ${freeDir}/mri/brainmask.auto.mgz
 	cp ${freeDir}/mri/brainmask.auto.mgz ${freeDir}/mri/brainmask.mgz
 	recon-all -autorecon2 -autorecon3 -s FreeSurfer -openmp $threads
 	recon-all -s FreeSurfer -localGI
-	if [[ -f $FLAIR ]];then
-		if [[ ! -f ${freeDir}/surf/lh.woFLAIR.pial ]];then
-			echo ""
-			echo "#########################################################################################################"
-			echo "#####################################Cleanup of Surface With FLAIR#######################################"
-			echo "#########################################################################################################"
-			echo ""
-			recon-all -subject FreeSurfer -FLAIRpial -FLAIR $FLAIR -FLAIRpial -autorecon3 -openmp $threads #citation: https://surfer.nmr.mgh.harvard.edu/fswiki/recon-all#UsingT2orFLAIRdatatoimprovepialsurfaces
-			rm -r ${freeDir}/SUMA ##Removed because SUMA surface will be based on wrong pial if above ran
-		fi
-	fi
+	#if [[ -f $FLAIR ]];then
+	#	if [[ ! -f ${freeDir}/surf/lh.woFLAIR.pial ]];then
+	#		echo ""
+	#		echo "#########################################################################################################"
+	#		echo "#####################################Cleanup of Surface With FLAIR#######################################"
+	#		echo "#########################################################################################################"
+	#		echo ""
+	#		recon-all -subject FreeSurfer -FLAIRpial -FLAIR $FLAIR -FLAIRpial -autorecon3 -openmp $threads #citation: https://surfer.nmr.mgh.harvard.edu/fswiki/recon-all#UsingT2orFLAIRdatatoimprovepialsurfaces
+	#		rm -r ${freeDir}/SUMA ##Removed because SUMA surface will be based on wrong pial if above ran
+	#	fi
+	#fi
 else
 	echo ""
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!Skipping FreeSurfer, Completed Previously!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"

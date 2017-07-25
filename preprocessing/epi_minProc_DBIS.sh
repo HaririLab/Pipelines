@@ -118,6 +118,7 @@ mscriptDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Scripts/NewPipeline
 # Loop through template MATLAB script replacing keywords
 for i in ${mscriptDir}'/spm_fieldmap.m'; do
 sed -e 's@SUB_SUBJECT_SUB@'$sub'@g' \
+	-e 's@SUB_NUMTRS_SUB@'$expLen'@g' \
 	-e 's@SUB_TASK_SUB@'$task'@g' <$i> spm_fieldmap.m
 done
 # run script

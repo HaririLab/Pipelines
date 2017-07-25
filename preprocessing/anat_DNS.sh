@@ -109,7 +109,7 @@ if [[ ! -f ${QADir}/anat.BrainExtractionCheckAxial.png ]];then
 	CreateTiledMosaic -i ${antDir}/${antPre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/highRes_BrainRBG.nii.gz -o ${QADir}/anat.BrainExtractionCheckAxial.png -a 0.5 -t -1x-1 -d 2 -p mask -s [5,mask,mask] -x ${tmpDir}/highRes_BrainRBGstep.nii.gz -f 0x1
 	CreateTiledMosaic -i ${antDir}/${antPre}BrainSegmentation0N4.nii.gz -r ${tmpDir}/highRes_BrainRBG.nii.gz -o ${QADir}/anat.BrainExtractionCheckSag.png -a 0.5 -t -1x-1 -d 0 -p mask -s [5,mask,mask] -x ${tmpDir}/highRes_BrainRBGstep.nii.gz -f 0x1
 fi
-if [[ ! -f ${freeDir}/SUMA/std.60.rh.pial.asc ]];then
+if [[ ! -f ${freeDir}/surf/rh.pial ]];then
 	###Prep for Freesurfer with PreSkull Stripped
 	#Citation: followed directions from https://surfer.nmr.mgh.harvard.edu/fswiki/UserContributions/FAQ (search skull)
 	echo ""
@@ -117,7 +117,9 @@ if [[ ! -f ${freeDir}/SUMA/std.60.rh.pial.asc ]];then
 	echo "#####################################FreeSurfer Surface Generation#######################################"
 	echo "#########################################################################################################"
 	echo ""
+	rm -r ${freeDir}
 	mksubjdirs FreeSurfer
+	cp -R ${FREESURFER_HOME}/subjects/fsaverage ${subDir}/
 	mri_convert ${antDir}/${antPre}ExtractedBrain0N4.nii.gz ${freeDir}/mri/001.mgz
 	#Run 
 	recon-all -autorecon1 -noskullstrip -s FreeSurfer -openmp $threads
@@ -147,7 +149,7 @@ fi
 
 #cleanup
 #mv highRes_* antCT/ #pipeNotes: add more deletion and clean up to minimize space, think about deleting Freesurfer and some of SUMA output
-rm -r ${antDir}/tmp ${freeDir}/bem ${freeDir}/label ${freeDir}/morph ${freeDir}/mpg ${freeDir}/mri ${freeDir}/rgb ${freeDir}/src ${freeDir}/surf ${freeDir}/tiff ${freeDir}/tmp ${freeDir}/touch ${freeDir}/trash ${freeDir}/SUMA/lh.* ${freeDir}/SUMA/rh.* ${freeDir}/SUMA/FreeSurfer_.*spec
+rm -r ${antDir}/tmp ${freeDir}/SUMA/lh.* ${freeDir}/SUMA/rh.* ${freeDir}/SUMA/FreeSurfer_.*spec #${freeDir}/bem ${freeDir}/label ${freeDir}/morph ${freeDir}/mpg ${freeDir}/mri ${freeDir}/rgb ${freeDir}/src ${freeDir}/surf ${freeDir}/tiff ${freeDir}/tmp ${freeDir}/touch ${freeDir}/trash 
 rm ${antDir}/${antPre}BrainNormalizedToTemplate.nii.gz ${antDir}/${antPre}TemplateToSubject*
 gzip ${freeDir}/SUMA/*.nii 
  
