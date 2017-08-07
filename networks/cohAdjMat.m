@@ -1,4 +1,4 @@
-function cohAdjMat(roiTS,outDir)
+function cohAdjMat(roiTS,outDir,prefix)
 addpath(genpath('/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Analysis/Max/scripts/Pipelines/ThirdParty/wc'));
 fmDat=load(roiTS);
 [a b]=size(fmDat);
@@ -7,7 +7,7 @@ which modwt
 wav2decom = zeros(a,b);
 for i=1:b
     wavDec=modwt(fmDat(:,i),'LA8','conservative','circular');
-    wav2decom(:,i)=wavDec(2,:); % wavelet 2 for node i
+    wav2decom(:,i)=wavDec(:,2); % wavelet 2 for node i
 end
 %create coherence adjacency matrix
 cap=a-14;%upper limit of lower window edge, change if you want a shorter or longer sliding window
@@ -27,5 +27,5 @@ for low=1:cap
             adjMat(j,i,low)=adjMat(i,j,low);%make adjMat symetrical
         end
     end
-    dlmwrite([outDir 'adjMat_win' num2str(low)],adjMat(:,:,low));
+    dlmwrite([outDir prefix '_adjMatWin' num2str(low)],adjMat(:,:,low));
 end

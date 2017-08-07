@@ -75,7 +75,7 @@ L_INIT_VARS:
     set debug     = 0
     set ldlist = (141 60)
     #set fsdsets = (thickness.gii.dset)
-    set fsdsets = (thickness curv sulc pial_lgi) 
+    set fsdsets = (thickness curv sulc pial_lgi area) 
     set inflates = ()
     
     set surf_attribs = (smoothwm      \

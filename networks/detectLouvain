@@ -78,7 +78,6 @@ roi2ts.R -i $epi -r $rois >
 
 ###Do wavelet/spectral correlation
 
-##Detect FDR significant associations and set all non-significant to 0
 
 ## Run mulit-slice community detection many times ussing genLouvain or iterated_genLouvain in MATLAB
 

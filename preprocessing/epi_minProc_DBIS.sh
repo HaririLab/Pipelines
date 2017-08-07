@@ -130,8 +130,7 @@ gzip ${tmpDir}/uepi_dt.nii
 #gzip ${tmpDir}/epi_dt.nii
 mv ${tmpDir}/uepi_dt.nii.gz ${tmpDir}/epi_dtv.nii.gz
 rm ${tmpDir}/epi_dt.nii
-mv ${outDir}/motion_spm.1D ${outDir}/motion.1D
-3drefit -space ORIG -view orig ${tmpDir}/epi_dtv.nii.gz
+3drefit -TR 2 -space ORIG -view orig ${tmpDir}/epi_dtv.nii.gz
 
 3dAutomask -prefix ${tmpDir}/epi_ExtractionMask.nii.gz ${tmpDir}/epi_dtv.nii.gz #Create brain mask for extraction
 3dcalc -a ${tmpDir}/epi_ExtractionMask.nii.gz -b ${tmpDir}/epi_dtv.nii.gz -expr 'a*b' -prefix ${tmpDir}/epi_dtvb.nii.gz #extract brain
@@ -188,7 +187,7 @@ fsl_motion_outliers --nomoco --dvars -m ${tmpDir}/epi_ExtractionMask.nii.gz -o $
 #Caluclate DVARS #citation: Nichols, 2013
 DVARS.sh ${tmpDir}/epi_dtv.nii.gz ${outDir}/DVARS.1D  ##Use Tom Nichols standardized DVARs #pipenotes: here is one paper with a standardized DVARs threshold(1.8) #citation: https://pdfs.semanticscholar.org/8b64/7293808a4903e877f93d8241428b7596a909.pdf
 #Calculate derivative of motion params for confound regression, #citation: Power et al., 2014
-1d_tool.py -infile ${outDir}/motion_spm.1D -derivative -write ${outDir}/motion_deriv.1D
+1d_tool.py -infile ${outDir}/motion_spm_deg.1D -derivative -write ${outDir}/motion_deriv.1D
 #calculate TRs above threshold
 awk -v thresh=".25" '{if($1 > thresh) print NR}' ${outDir}/FD.1D > ${outDir}/FD.25TRs.1D #find TRs above threshold 
 awk -v thresh=".5" '{if($1 > thresh) print NR}' ${outDir}/FD.1D > ${outDir}/FD.5TRs.1D #find TRs above threshold 
@@ -248,7 +247,7 @@ CreateTiledMosaic -i ${tmpDir}/epiPreb0.nii.gz -r ${tmpDir}/epiPreb0.nii.gz -o $
 CreateTiledMosaic -i ${tmpDir}/epiPostb0.nii.gz -r ${tmpDir}/epiPostb0.nii.gz -o ${QADir}/${task}.postB0.png -a 0 -t -1x-1 -d 2 -p mask -s [15,0,120] -x ${tmpDir}/epiPostb0.nii.gz -f 0x1 -p 0
 
 ##Clean up
-rm -r $tmpDir
+# rm -r $tmpDir
 
 
 ##########Citations
