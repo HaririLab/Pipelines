@@ -30,6 +30,8 @@ tmpDir=${antDir}/tmp
 antPre="highRes_" #pipenotes= Change away from HardCoding laterF
 templateDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Analysis/Max/templates/DBIS115 #pipenotes= update/Change away from HardCoding later
 templatePre=dunedin115template_MNI #pipenotes= update/Change away from HardCoding later
+anatDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_t1_0.9_mprage_sag_iso_p2/
+flairDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_3D_SAG_FLAIR_FS-_1.2_mm/
 #T1=$2 #/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DNS.01/Data/Anat/20161103_21449/bia5_21449_006.nii.gz #pipenotes= update/Change away from HardCoding later
 threads=1 #default in case thread argument is not passed
 threads=$2
@@ -60,10 +62,7 @@ FLAIR=${tmpDir}/flair.nii.gz
 
 
 if [[ ! -f ${antDir}/${antPre}CorticalThicknessNormalizedToTemplate.nii.gz ]];then
-	anatDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_t1_0.9_mprage_sag_iso_p2/
-	flairDir=/mnt/BIAC/munin2.dhe.duke.edu/Hariri/DBIS.01/Data/OTAGO/${sub}/DMHDS/MR_3D_SAG_FLAIR_FS-_1.2_mm/
 	Dimon -infile_prefix ${anatDir}/1.3.12.2.1107.5.2.19 -dicom_org -gert_create_dataset -use_obl_origin
-	Dimon -gert_to3d_prefix flair.nii.gz -infile_prefix ${flairDir}/1.3.12.2.1107.5.2.19 -dicom_org -gert_create_dataset -use_obl_origin
 	bestT1=$(ls OutBrick_run_0* | tail -n1)
 	3dcopy ${bestT1} ${tmpDir}/anat.nii.gz
 	mv flair.nii.gz dimon* GERT* ${tmpDir}
@@ -147,23 +146,24 @@ if [[ ! -f ${freeDir}/surf/rh.pial ]];then
 	#cp ${freeDir}/mri/brainmask.auto.mgz ${freeDir}/mri/brainmask.mgz
 	#recon-all -autorecon2 -autorecon3 -s $sub -openmp $threads
 	recon-all -s $sub -localGI -openmp $threads
-	if [[ -f $FLAIR ]];then
-		if [[ ! -f ${freeDir}/surf/lh.woFLAIR.pial ]];then
-			echo ""
-			echo "#########################################################################################################"
-			echo "#####################################Cleanup of Surface With FLAIR#######################################"
-			echo "#########################################################################################################"
-			echo ""
-			recon-all -subject $sub -FLAIR $FLAIR -FLAIRpial -autorecon3 -openmp $threads #citation: https://surfer.nmr.mgh.harvard.edu/fswiki/recon-all#UsingT2orFLAIRdatatoimprovepialsurfaces
-			rm -r ${freeDir}/SUMA ##Removed because SUMA surface will be based on wrong pial if above ran
-		fi
-	fi
 else
 	echo ""
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!Skipping FreeSurfer, Completed Previously!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 	echo ""
 fi
-
+if [[ ! -f ${freeDir}/surf/lh.woFLAIR.pial ]];then
+	Dimon -gert_to3d_prefix flair.nii.gz -infile_prefix ${flairDir}/1.3.12.2.1107.5.2.19 -dicom_org -gert_create_dataset -use_obl_origin
+	mv flair.nii.gz dimon* GERT* ${tmpDir}
+	if [[ -f $FLAIR ]];then
+		echo ""
+		echo "#########################################################################################################"
+		echo "#####################################Cleanup of Surface With FLAIR#######################################"
+		echo "#########################################################################################################"
+		echo ""
+		recon-all -subject $sub -FLAIR $FLAIR -FLAIRpial -autorecon3 -openmp $threads #citation: https://surfer.nmr.mgh.harvard.edu/fswiki/recon-all#UsingT2orFLAIRdatatoimprovepialsurfaces
+		rm -r ${freeDir}/SUMA ##Removed because SUMA surface will be based on wrong pial if above ran
+	fi
+fi
 #Run SUMA
 if [[ ! -f ${freeDir}/SUMA/std.60.rh.thickness.niml.dset ]];then
 	echo ""
@@ -185,6 +185,6 @@ fi
 #cleanup
 #mv highRes_* antCT/ #pipeNotes: add more deletion and clean up to minimize space, think about deleting Freesurfer and some of SUMA output
 rm -r ${antDir}/${antPre}BrainNormalizedToTemplate.nii.gz ${antDir}/${antPre}TemplateToSubject* ${subDir}/dimon.files* ${subDir}/GERT_Reco* ${antDir}/tmp
-rm -r ${antDir}/tmp ${freeDir}/SUMA/FreeSurfer_.*spec  ${freeDir}/SUMA/lh.* ${freeDir}/SUMA/rh.* ${subDir}/fsaverage 
+rm -r ${antDir}/tmp ${freeDir}/SUMA/FreeSurfer_.*spec  ${freeDir}/SUMA/lh.* ${freeDir}/SUMA/rh.*
 gzip ${freeDir}/SUMA/*.nii 
  
